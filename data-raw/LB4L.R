@@ -1,23 +1,7 @@
 # LB4L data munging
 library(dplyr)
+library(whoppeR)
 
-score <- function(target,resp,s) {
-  for (k in which(grepl('.', resp))) {
-    # Try hard string matching first
-    acc <- resp[k] == target[k]
-    if (acc) {
-      s[k] <- 1 # response is exact match to target string
-    } else { 
-      # try fuzzy matching 
-      inds <- agrepl(resp[k], target[k])
-      if (inds) {
-        s[k] <- 2 # A fuzzy substring match was found
-      } else  {
-        s[k] <- 0 # hard and fuzzy matching failed
-        
-      }
-    }
-  }
 
 flist <- list.files("data-raw", pattern="LB4L+.+csv", full.names = TRUE)
 rawData <-lapply(flist, read.csv, header=T, sep=',',
@@ -30,10 +14,10 @@ rawData <-lapply(flist, read.csv, header=T, sep=',',
 rawData <- do.call(rbind,rawData)
 
 # Compute accuracy on cued-recall practice test
-tmp <- data %>% filter(list !=1) %>% 
-  group_by(subject,group,list) %>% 
-  mutate(prac_score = score(target,prac_resp,prac_score),
-         final_score = score(target,final_resp,final_score))
+tmp <- rawData %>% filter(list !=1) %>%
+  group_by(subject,group,list) %>%
+  mutate(prac_score = score(target,prac_resp),
+         final_score = score(target,final_resp))
 
 # Use the interactive editor to make decisions about fuzzy matches 
 cleaned1 <- edit(tmp[tmp$prac_score %in% 2, c("subject","target","prac_resp","prac_score")])
