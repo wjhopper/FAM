@@ -6,7 +6,7 @@ Description: Contains the analysis of 3 experimental datasets. List Before the L
 	Cumulative Free Recall (CFR). 
 URL: https://github.com/wjhopper/FAM
 BugReports: https://github.com/wjhopper/FAM/issues
-Depends: R (>= 3.2.1)
+Depends: R (>= 3.0.0)
 Imports: dplyr, ggplot2, grid, gridExtra, reshape2, whoppeR
 Suggests: knitr
 License: CC0
