@@ -19,10 +19,7 @@ score <- function(target,resp,s) {
     }
   }
 
-  return(as.numeric(s))
-}
-
-flist <- list.files("data-raw", pattern="LB4L*.csv", full.names = TRUE)
+flist <- list.files("data-raw", pattern="LB4L+.+csv", full.names = TRUE)
 rawData <-lapply(flist, read.csv, header=T, sep=',',
            col.names=c('subject','group','version','datetime','exp_onset',
                        'list','repeating','practice','cue','target',
@@ -48,6 +45,6 @@ tmp$final_score[tmp$final_score %in% 2] <- cleaned2$final_score
 
 tmp$final_score[is.nan(tmp$final_score)] <- 0
 tmp$prac_score[is.nan(tmp$prac_score) & tmp$practice =='T'] <- 0
-data <- rbind(filter(rawData, list==1, tmp))
+data <- rbind(filter(rawData, list==1), tmp)
 save(data, file.path("data","LB4L.Rdata"))
 
