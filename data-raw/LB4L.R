@@ -2,7 +2,6 @@
 library(dplyr)
 library(whoppeR)
 
-
 flist <- list.files("data-raw", pattern="LB4L+.+csv", full.names = TRUE)
 rawData <-lapply(flist, read.csv, header=T, sep=',',
            col.names=c('subject','group','version','datetime','exp_onset',
@@ -14,21 +13,31 @@ rawData <-lapply(flist, read.csv, header=T, sep=',',
 rawData <- do.call(rbind,rawData)
 
 # Compute accuracy on cued-recall practice test
-tmp <- rawData %>% filter(list !=1) %>%
-  group_by(subject,group,list) %>%
+rawData <- rawData %>%
+  group_by(subject,group,list,cue) %>%
   mutate(prac_score = score(target,prac_resp),
          final_score = score(target,final_resp))
 
-# Use the interactive editor to make decisions about fuzzy matches 
-cleaned1 <- edit(tmp[tmp$prac_score %in% 2, c("subject","target","prac_resp","prac_score")])
-cleaned2 <- edit(tmp[tmp$final_score %in% 2, c("subject","target","final_resp","final_score")])
+# There never was a test for these so fix them at NA
+rawData$prac_score[rawData$practice %in% c("C","S") | rawData$list ==1]  <- NA
+
+# Use the interactive editor to make decisions about fuzzy matches
+cleaned1 <- edit(rawData[rawData$prac_score %in% 2, c("subject","target",
+                                              "prac_resp","prac_score")])
+cleaned2 <- edit(rawData[rawData$final_score %in% 2, c("subject","target",
+                                               "final_resp","final_score")])
 
 # Replace the fuzzy matches with the manual decisions
-tmp$prac_score[tmp$prac_score %in% 2] <- cleaned1$prac_score
-tmp$final_score[tmp$final_score %in% 2] <- cleaned2$final_score
+rawData$prac_score[rawData$prac_score %in% 2] <- cleaned1$prac_score
+rawData$final_score[rawData$final_score %in% 2] <- cleaned2$final_score
 
-tmp$final_score[is.nan(tmp$final_score)] <- 0
-tmp$prac_score[is.nan(tmp$prac_score) & tmp$practice =='T'] <- 0
-data <- rbind(filter(rawData, list==1), tmp)
-save(data, file.path("data","LB4L.Rdata"))
+rawData <- rawData %>%group_by(subject,target) %>%
+  # Add identifier and score for the other half of the repeating target 'pair'
+  mutate(other_prac_acc  = if (n() > 1) { rev(prac_score) } else { NA_real_},
+         other_type  =  if (n() > 1) { rev(practice) } else { NA_character_})
+
+rawData$final_score[rawData$practice %in% "T" & rawData$other_type %in% "C"]  <- NA
+
+# Save as binary rda
+# save(rawData, file = file.path("data","LB4L_allSs.rda"))
 
