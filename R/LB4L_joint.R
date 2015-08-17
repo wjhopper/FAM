@@ -1,0 +1,32 @@
+#' @import dplyr
+#' @export
+LB4L_joint <- function(data) {
+  jointAcc <- data  %>% filter(list != 1)  %>%
+    group_by(subject, group, practice, other_type,
+             prac_score,other_prac_acc,final_score) %>%
+    summarise(cell_count = n())
+
+  # I know from visual inspection that subject 20 has complete cases in each cell
+  # So, use subject 20's data as a template to join by
+  joinerFrame <- filter(jointAcc,subject==20) %>%
+    ungroup() %>%
+    select(practice,other_type,prac_score,other_prac_acc,final_score)
+  bigJoinerFrame <- cbind(subject = rep(unique(data$subject),
+                                        each=nrow(joinerFrame)),
+                          joinerFrame)
+  jointAcc <- left_join(bigJoinerFrame, jointAcc) %>%
+    group_by(subject) %>%
+    mutate(group = group[!is.na(group)][1],
+           cell_count = replace(cell_count, is.na(cell_count),0)) %>%
+    left_join(select(ungroup(conds_by_ss),
+                     subject,group,practice,other_type,grp_size=n),
+              by =c("subject","group","practice","other_type")) %>%
+    mutate(acc = cell_count/grp_size)
+
+  jointAcc_grouped <- jointAcc %>%
+    group_by(group, practice, other_type, prac_score,
+             other_prac_acc,final_score) %>%
+    summarise(avgAcc = mean(acc))
+
+  return(subject = jointAcc, groups = jointAcc_grouped)
+}

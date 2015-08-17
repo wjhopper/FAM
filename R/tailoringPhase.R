@@ -2,7 +2,7 @@
 #' @import ggplot2
 #' @export
 #'
-tailoringPhase <- function(data = NULL, return.data = TRUE, return.plots = TRUE) {
+tailoringPhase <- function(data, return.data = TRUE, return.plot = TRUE) {
 
   tailoring_means <- data %>% filter(list == 1) %>%
     group_by(subject) %>%
@@ -18,7 +18,7 @@ tailoringPhase <- function(data = NULL, return.data = TRUE, return.plots = TRUE)
     scale_y_continuous("Proportion of Subjects", limits = c(0,max(tm$Freq+.025))) +
     geom_text(aes(label =c("6 Secs","5 secs","4 Secs"), y= Freq+.025)) +
     xlab("Practice List Performance") +
-    mytheme +
+    theme_larger() +
     ggtitle('Percent of Subjects with Specific Performance Levels')
 
   if (return.plot & return.data) {
