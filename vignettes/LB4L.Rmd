@@ -1,0 +1,243 @@
+---
+title: "'List Before Last' Performance Analysis"
+author: "Will Hopper"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    fig_caption: yes
+    toc: true
+    toc_depth: 2
+    css: custom.css
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r knitr_setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
+library(whoppeR)
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(FAM)
+library(grid)
+library(gridExtra)
+knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE, 
+               warning=F, message=FALSE, fig.align='center')
+```
+
+Start by removing any subjects with less than 5% accuracy across all conditions. They are not helpful.
+
+```{r removeBaddies} 
+  subject_means <- badSubs(LB4L_allSs)
+  print(subject_means$removed)
+  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% subject_means$removed)) %>%
+    droplevels()
+```
+
+```{r set_data_types}
+  cols <- colnames(LB4L_allSs) %in% c("subject","list","practice","repeating","target")
+  LB4L_allSs[cols] <- lapply(LB4L_allSs[cols], factor)
+  LB4L_allSs$group <- factor(LB4L_allSs$group, levels = c("immediate", "delay"))
+  LB4L_allSs$other_type <- factor(LB4L_allSs$other_type,exclude = NULL)
+```
+
+## Tailoring Phase
+```{r tailoring}
+  tp <- tailoringPhase(LB4L_allSs)
+  print(tp$figure)
+```
+
+
+## Grand Average Performance
+```{r grandAvg}
+group_means <-  LB4L_allSs %>% filter(list != 1) %>%
+  group_by(group) %>%
+  summarise(final_acc=mean(final_score, na.rm=T),
+            prac_acc = mean(prac_score, na.rm=T))
+
+sub_means_plot <- ggplot(subject_means$means,aes(prac_acc,final_acc)) +
+  geom_point(aes(color= group),size=4) +
+  geom_point(aes(prac_acc,final_acc,fill=group),
+             data = group_means,shape=25,size=4,color='black') +
+  scale_x_continuous("Practice Test Accuracy",limits=c(0,1)) +
+  ylab("Final Test Accuracy") +
+  theme_larger() +
+  ggtitle("Grand Average Performace by Subject within Group")
+
+print(sub_means_plot)
+```
+
+
+## Subject Performance 
+
+```{r allSubjects}
+
+IVsummary <- LB4L_IV(LB4L_allSs)
+IVss <- melt(IVsummary$subject,
+             id.vars = c("subject","group","practice","other_type","chain"),
+             measure.vars = c("prac_acc","final_acc"),
+             variable.name = "timepoint", value.name="acc")
+IVss$chain[IVss$chain==4] <- 1
+condSummary <- LB4L_conditional(LB4L_allSs)
+
+subs <- unique(LB4L_allSs$subject)
+for(i in subs) {
+  
+  IVplot <- ggplot(data= filter(IVss, subject==i, is.finite(acc)),
+                   aes(x=timepoint,y=acc, color=chain, group =chain)) +
+    geom_point(size=3) +    
+    geom_line(size=.75) + 
+    scale_x_discrete("Test",expand=c(0,.25),labels=c("Practice","Final")) + 
+    scale_color_discrete("Condition",labels = c("2 Cues\n #1=Tested, #2=Unpracticed",
+                                                "1 Cue, No Practice",
+                                                "1 Cue, Restudied",
+                                                "1 Cue, Tested")) + 
+    scale_y_continuous("Final Test Accuracy",limit=0:1) + 
+    theme_larger() + 
+    theme(legend.key.height=unit(2,"line")) + 
+    ggtitle('Test Accuracy')
+
+  conPlot <- ggplot(filter(condSummary$subject,subject == i, 
+                           merged_prac_score %in% 0:1),
+                    aes(x=other_type, y= final_acc,
+                        fill=merged_prac_score,ymax=1)) +
+    geom_bar(position='dodge',stat="identity") +
+    # label n observations in each cell
+    geom_text(aes(y=-.05,label = count, group=merged_prac_score),
+              position = position_dodge(width=0.9)) +
+    scale_fill_brewer("Practice\nAccuracy",
+                      breaks=c(0,1),
+                      labels=c("Incorrect", "Correct"),
+                      palette="Set1") +
+    scale_x_discrete("Final Test Cue", 
+                     limits=c(NA,'T'),labels=c("Practiced","Unpracticed")) +
+    scale_y_continuous("Final Test Accuracy",expand=c(0,.02)) +
+    theme_larger() + 
+    ggtitle('Conditional Final Test Accuracy')
+  
+    cat('<h4 class="subid">', subs[i], '</h4>')
+    grid.arrange(IVplot, conPlot, ncol=2, nrow=1)
+}
+```
+
+
+```{r collapsedGroups}
+missings <- condSummary$subject %>% filter(count == 0) %>%
+  select(subject) %>% unique()
+p_missing <- nrow(missings)/length(unique(condSummary$subject$subject)) 
+
+IVgrouped <- melt(IVsummary$groups,
+                  id.vars = c("group","practice","other_type","chain"),
+                  measure.vars = c("prac_acc","final_acc"),
+                  variable.name = "timepoint", value.name="acc")
+IVgrouped$chain[IVgrouped$chain==4] <- 1
+IVgrouped$timepoint <- factor(IVgrouped$timepoint,labels=c(1,2))
+#step two: add an unused level to this new factor
+IVgrouped$timepoint <- factor(IVgrouped$timepoint,levels =c(1,2,3))
+#Step three: values where group is delay and timepoint is 2
+# (aka final test) become a 3 now
+IVgrouped$timepoint[IVgrouped$timepoint %in% 2
+                    & IVgrouped$group == 'delay'] <- as.factor(3)
+levels(IVgrouped$other_type) <- list(T='T',C='C',none=NA)
+```
+
+
+## Averaged Results
+```{r groupedPlots}
+IVaveragedPlot <- ggplot(filter(IVgrouped, is.finite(acc)) %>%
+                       mutate(group_del_to_imm = replace(group,
+                                           which(group=='delay' & timepoint ==3),
+                                           'immediate'),
+                              group_imm_to_del = replace(group,
+                                           which(group=='immediate' & timepoint ==2),
+                                           'delay'),
+                grouping2 = interaction(group_imm_to_del,chain)),
+       aes(x=timepoint,color=chain, y=acc,ymax=.85,ymin=.15)) +
+    geom_point(size=3) +
+    geom_line(aes(group = interaction(group_del_to_imm,chain)),size=.75) +
+    scale_color_discrete("Condition",labels = c("2 Cues\n #1=Tested , #2=Unpracticed",
+                                                "1 Cue, No Practice",
+                                                "1 Cue, Restudied",
+                                                "1 Cue, Tested")) + 
+    scale_x_discrete("Group",expand=c(0,.25),labels=c("Practice","Immediate","Delay")) + 
+    ylab("Final Test Accuracy") + 
+    theme_larger() +
+    theme(legend.key.height=unit(2,"line")) + 
+    ggtitle('Cued Recall Accuracy')
+
+condAvergedPlot <- ggplot(filter(condSummary$groups,merged_prac_score %in% 0:1),
+                          aes(x=other_type, y= final_acc,
+                              fill=merged_prac_score,ymax=1)) +
+  geom_bar(position='dodge',stat="identity") +
+  facet_grid(. ~ group, labeller=function(...) { return(c("Immediate","Delayed"))}) +
+  geom_errorbar(aes(ymax =upper, ymin=lower),
+                position=position_dodge(width=.9), width=0.2) +
+  # label n observations in each cell
+  geom_text(aes(y=-.05,label = n_obs,group=merged_prac_score),
+            position = position_dodge(width=0.9)) +
+  # label percent missing in each cell!
+  geom_text(aes(y=-.02,label = paste(round(missing,3)*100,'%',sep=''),
+                group=merged_prac_score),
+            position = position_dodge(width=.9)) +
+  scale_fill_brewer("Practice\nAccuracy",
+                    breaks=c(0,1),
+                    labels=c("Incorrect", "Correct"),
+                    palette="Set1") +
+  scale_x_discrete("Final Test Cue", limits=c(NA,'T'),
+                   labels=c("Practiced","Unpracticed")) +
+  scale_y_continuous("Final Test Accuracy",expand=c(0,.02)) +
+  theme_larger() +
+  ggtitle('Conditional Final Test Accuracy For Tested Items')
+
+  grid.arrange(IVaveragedPlot, condAvergedPlot, ncol=1,nrow=2)
+```
+
+```{r tmp, eval=FALSE}
+## Log odds of conditional data ####
+## @knitr logodds_plots
+
+# Calculate the log odds with the aggregate data
+log_of_means  <- filter(conAcc_grouped,merged_prac_score %in% 0:1) %>%
+  group_by(group,practice,other_type) %>%
+  summarize(logodds = log(final_acc[merged_prac_score%in%1]/final_acc[merged_prac_score%in%0]),
+            upp_bound = log(upper[merged_prac_score%in%1]/lower[merged_prac_score%in%0]),
+            low_bound = log(lower[merged_prac_score%in%1]/upper[merged_prac_score%in%0])) %>%
+  droplevels()
+
+log_of_means_plot <- ggplot(data=log_of_means, aes(x=group, y = logodds, fill=practice)) +
+  geom_bar(position='dodge',stat="identity") +
+  geom_errorbar(aes(ymax =upp_bound, ymin=low_bound),
+                position=position_dodge(width=0.9), width=0.2) +
+  scale_fill_brewer("Cue Used", labels=c("Practiced Cue","Unpracticed Cue"),
+                    limits=c('T','C'),
+                    drop=TRUE, palette="Set1") +
+  scale_x_discrete("Group",labels = c("Immediate","Delayed")) +
+  ylab("Log Odds Ratio") +
+  mytheme +
+  ggtitle('Diagnosticity of Practice Accuracy')
+
+
+# calculate log odds subject wise
+conAcc_grouped_log <- conAcc %>% filter((practice=='T'| other_type=='T'), !(practice=='T' & other_type =='C')) %>%
+  group_by(subject,group,practice,other_type) %>%
+  summarize(logodds = calc_odds(final_acc,merged_prac_score)) %>%
+  mutate(logodds = replace(logodds, which(!is.finite(logodds)),NA_real_)) %>%
+#  filter(!(subject %in% subject[!is.finite(logodds)])) %>%  # maybe want to use this if we want subs with observations in both conditions
+  group_by(group,practice,other_type) %>%
+  summarise(odds = mean(logodds,na.rm = TRUE),
+            missing=length(logodds[!is.na(logodds)])/length(odds))
+
+mean_of_logs_plot <- ggplot(conAcc_grouped_log, aes(x = group, y= odds,fill=practice,ymax= max(odds+.025))) +
+  geom_bar(position='dodge',stat="identity") +
+  geom_text(aes(y=.05, label = as.character(missing)),
+            position = position_dodge(width=.9)) +
+  scale_fill_brewer("Number of Cues", labels=c("Practiced Cue","Unpracticed "),
+                    limits=c('T','C'),
+                    palette="Set1",drop=F) +
+  scale_x_discrete("Group",labels = c("Immediate","Delayed")) +
+  ylab("Log Odds Ratio") +
+  mytheme +
+  ggtitle('Diagnosticity of Practice Accuracy')
+
+```
