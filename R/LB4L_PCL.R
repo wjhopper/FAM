@@ -198,9 +198,9 @@ LB4L_PCLss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                        jointData$other_prac_acc %in% 0:1) &
                      jointData$final_score %in% 0:1])
 
-  err <- binomialLL(obs=obs[1:2],pred=preds[c("C","S")],N=N[1:2]) +
+  err <- binomialLL(obs=obs[1:2],pred=preds[c("C","S")],N=p['nList']) +
     multinomialLL(obs = obs[3:10],pred = preds[grepl('T_', names(preds))],
-                  N = N[3:10])
+                  N = p['nList'])
 
   if (fitting) {
     return(err)
