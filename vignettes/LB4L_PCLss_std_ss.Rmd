@@ -54,16 +54,35 @@ IVdata <- model$IVdata %>%
 
 ```{r condDataSs}
  condData <- LB4L_conditional(LB4L_allSs)$subject %>% 
-   filter(!is.na(final_acc), !is.na(merged_prac_score)) %>% 
+   filter(!is.na(final_acc), !is.na(merged_prac_score))
+ condData <- condData  %>% 
    mutate(type='model') %>% 
    group_by(subject) %>%
-   mutate(final_acc = replace(final_acc, practice=='C' & other_type!='T',
+   mutate(final_acc = replace(final_acc, practice=='C' & merged_prac_score == 1,
+                              preds$CTplus[subject[1]]),
+          final_acc = replace(final_acc, practice=='C' & merged_prac_score == 0,
+                              preds$CTneg[subject[1]]),
+          final_acc = replace(final_acc, practice=='T' & merged_prac_score == 1,
+                              preds$Tplus[subject[1]]),
+          final_acc = replace(final_acc, practice=='T' & merged_prac_score == 0,
+                              preds$Tneg[subject[1]])) %>% 
+      rbind(cbind(condData,type="real"))
+```
+   
+```{r jointDataSs}   
+jointData <- model$jointData %>% 
+   mutate(type = "model") %>%
+   group_by(subject) %>%
+   mutate(prac_acc = replace(prac_acc, !is.na(prac_acc), 
+                             preds$prac[subject[1]]),
+          final_acc = replace(final_acc, practice=='C' & other_type!='T',
                               preds$C[subject[1]]),
           final_acc = replace(final_acc, practice=='S', preds$S[subject[1]]),
           final_acc = replace(final_acc, practice=='T' & other_type!='C',
                               preds$`T`[subject[1]]),
           final_acc = replace(final_acc, practice=='C' & other_type=='T',
-                              preds$CT[subject[1]]))
-   
-   
+                              preds$CT[subject[1]])) %>% 
+   rbind(cbind(model$IVdata,type="real"))
+    
 ```
+
