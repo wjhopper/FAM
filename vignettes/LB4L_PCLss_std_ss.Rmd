@@ -1,0 +1,69 @@
+---
+title: "Vignette Title"
+author: "Vignette Author"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r setup}
+library(dplyr)
+library(FAM)
+model_prefix <- "LB4L_PCLss_std"
+```
+
+```{r load_or_fit}
+if (!exists(model_prefix)) {
+
+  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% badSubs(LB4L_allSs)$removed)) %>%
+  droplevels()
+  model <- list(par = c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
+              fn = LB4L_PCLss, method="Nelder-Mead", itnmax = 1000,
+              fixed= c(theta=.5,nFeat=100,nSim=1000,nList=15),
+              IVdata = LB4L_IV(LB4L_allSs)$subject,
+              jointData = LB4L_joint(LB4L_allSs)$subject,
+              fitting = TRUE, name = model_prefix)
+  model <- fitLB4L(model,inpar=TRUE)
+} else {
+  model <- get(model_prefix)
+}
+ preds <- do.call(rbind, lapply(lapply(model$results,`[[`, 'preds'),data.frame))
+ preds$subject<- unique(model$IVdata$subject)
+ fits <-  do.call(rbind, lapply(model$results,`[[`, 'fit'))
+ fits$subject<- preds$subject
+```
+
+```{r IVdataSs}
+IVdata <- model$IVdata %>% 
+   mutate(type = "model") %>%
+   group_by(subject) %>%
+   mutate(prac_acc = replace(prac_acc, !is.na(prac_acc), 
+                             preds$prac[subject[1]]),
+          final_acc = replace(final_acc, practice=='C' & other_type!='T',
+                              preds$C[subject[1]]),
+          final_acc = replace(final_acc, practice=='S', preds$S[subject[1]]),
+          final_acc = replace(final_acc, practice=='T' & other_type!='C',
+                              preds$`T`[subject[1]]),
+          final_acc = replace(final_acc, practice=='C' & other_type=='T',
+                              preds$CT[subject[1]])) %>% 
+   rbind(cbind(model$IVdata,type="real"))
+   
+```
+
+```{r condDataSs}
+ condData <- LB4L_conditional(LB4L_allSs)$subject %>% 
+   filter(!is.na(final_acc), !is.na(merged_prac_score)) %>% 
+   mutate(type='model') %>% 
+   group_by(subject) %>%
+   mutate(final_acc = replace(final_acc, practice=='C' & other_type!='T',
+                              preds$C[subject[1]]),
+          final_acc = replace(final_acc, practice=='S', preds$S[subject[1]]),
+          final_acc = replace(final_acc, practice=='T' & other_type!='C',
+                              preds$`T`[subject[1]]),
+          final_acc = replace(final_acc, practice=='C' & other_type=='T',
+                              preds$CT[subject[1]]))
+   
+   
+```
