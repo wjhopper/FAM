@@ -94,8 +94,8 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
     untrace(PCL)
   }
 
-  assign(paste(model$name, "results.rda",sep='_'), model$results)
-  save(list = paste(model$name, "results.rda",sep='_'),
+  assign(paste(model$name, "results",sep='_'), model$results)
+  save(list = paste(model$name, "results",sep='_'),
        file = file.path("data", paste(model$name, "results.rda",sep='_')))
   return(model)
 }

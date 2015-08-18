@@ -16,9 +16,9 @@ model_prefix <- "LB4L_PCLss_std"
 
 ```{r load_or_fit}
 if (!exists(model_prefix)) {
-
-  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% badSubs(LB4L_allSs)$removed)) %>%
-  droplevels()
+  bad <- badSubs(LB4L_allSs)$removed
+  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% as.numeric(bad))) %>%
+    droplevels()
   model <- list(par = c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
               fn = LB4L_PCLss, method="Nelder-Mead", itnmax = 1000,
               fixed= c(theta=.5,nFeat=100,nSim=1000,nList=15),
@@ -26,12 +26,13 @@ if (!exists(model_prefix)) {
               jointData = LB4L_joint(LB4L_allSs)$subject,
               fitting = TRUE, name = model_prefix)
   model <- fitLB4L(model,inpar=TRUE)
+  results <- model$results
 } else {
-  model <- get(model_prefix)
+  results <- get(model_prefix)
 }
- preds <- do.call(rbind, lapply(lapply(model$results,`[[`, 'preds'),data.frame))
+ preds <- do.call(rbind, lapply(lapply(results,`[[`, 'preds'),data.frame))
  preds$subject<- unique(model$IVdata$subject)
- fits <-  do.call(rbind, lapply(model$results,`[[`, 'fit'))
+ fits <-  do.call(rbind, lapply(results,`[[`, 'fit'))
  fits$subject<- preds$subject
 ```
 
