@@ -2,6 +2,9 @@
 #' @export
 LB4L_joint <- function(data) {
 
+  columns <- c("prac_score", "other_prac_acc")
+  data[,columns] <- lapply(data[,columns],factor,exclude=NULL)
+
   jointAcc <- data  %>% filter(list != 1)  %>%
     group_by(subject, group, practice, other_type,
              prac_score,other_prac_acc,final_score) %>%
@@ -18,7 +21,11 @@ LB4L_joint <- function(data) {
     group_by(subject) %>%
     mutate(group = group[!is.na(group)][1],
            cell_count = replace(cell_count, is.na(cell_count),0)) %>%
-    mutate(acc = cell_count/15)
+    mutate(acc = cell_count/15,
+           merged_prac_score = ifelse(is.na(levels(prac_score)[prac_score]),
+                                      as.numeric(levels(other_prac_acc))[other_prac_acc],
+                                      as.numeric(levels(prac_score))[prac_score]))
+  jointAcc$merged_prac_score <- factor(jointAcc$merged_prac_score)
 
   jointAcc_grouped <- jointAcc %>%
     group_by(group, practice, other_type, prac_score,
