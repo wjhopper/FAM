@@ -94,10 +94,13 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
     untrace(PCL)
   }
 
-  assign(paste(model$name, "results",sep='_'), model$results)
-  save(list = paste(model$name, "results",sep='_'),
-       file = file.path("data", paste(model$name, "results.rda",sep='_')))
-  return(model)
+  resultsFile <- paste(paste0(model_prefix, collapse = "_"),
+                       'results',sep='_')
+  assign(resultsFile, model[c("results","objective_fcn")])
+  save(list = resultsFile,
+       file = file.path("data",paste(paste0(model_prefix, collapse = "_"),
+                                     'results.rda',sep='_')))
+  return(model$results)
 }
 
 

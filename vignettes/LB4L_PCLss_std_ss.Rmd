@@ -11,33 +11,43 @@ vignette: >
 ```{r setup}
 library(dplyr)
 library(FAM)
-model_prefix <- "LB4L_PCLss_std"
+model_prefix <- c("LB4L_PCLss", "std")
+```
+
+
+```{r fetchData}
+bad <- badSubs(LB4L_allSs)$removed
+LB4L_allSs <- filter(LB4L_allSs, !(subject %in% bad))
+LB4L_allSs$subject <- factor(LB4L_allSs$subject)
+IVdata <- LB4L_IV(LB4L_allSs)
+jointData <- LB4L_joint(LB4L_allSs)
+condData <- LB4L_conditional(LB4L_allSs)
 ```
 
 ```{r load_or_fit}
-if (!exists(model_prefix)) {
-  bad <- badSubs(LB4L_allSs)$removed
-  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% as.numeric(bad))) %>%
-    droplevels()
+resultsFile <- paste(paste0(model_prefix, collapse = "_"),
+                  'results',sep='_')
+if (!exists(resultsFile)) {
   model <- list(par = c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
-              fn = LB4L_PCLss, method="Nelder-Mead", itnmax = 1000,
-              fixed= c(theta=.5,nFeat=100,nSim=1000,nList=15),
-              IVdata = LB4L_IV(LB4L_allSs)$subject,
-              jointData = LB4L_joint(LB4L_allSs)$subject,
-              fitting = TRUE, name = model_prefix)
-  model <- fitLB4L(model,inpar=TRUE)
-  results <- model$results
+                fn = LB4L_PCLss, method="Nelder-Mead", itnmax = 1000,
+                fixed= c(theta=.5,nFeat=100,nSim=1000,nList=15),
+                IVdata = IVdata$subject,
+                jointData = jointData$subject,
+                fitting = TRUE,
+                objective_fcn = model_prefix[1],
+                name = model_prefix[2])
+  results <- fitLB4L(model,inpar=TRUE)
 } else {
-  results <- get(model_prefix)
+  results <- get(resultsFile)
 }
  preds <- do.call(rbind, lapply(lapply(results,`[[`, 'preds'),data.frame))
- preds$subject<- unique(model$IVdata$subject)
+ preds$subject<- unique(IVdata$subject$subject)
  fits <-  do.call(rbind, lapply(results,`[[`, 'fit'))
  fits$subject<- preds$subject
 ```
 
 ```{r IVdataSs}
-IVdata <- model$IVdata %>% 
+IVdata_all <- IVdata$subject %>% 
    mutate(type = "model") %>%
    group_by(subject) %>%
    mutate(prac_acc = replace(prac_acc, !is.na(prac_acc), 
@@ -49,14 +59,14 @@ IVdata <- model$IVdata %>%
                               preds$`T`[subject[1]]),
           final_acc = replace(final_acc, practice=='C' & other_type=='T',
                               preds$CT[subject[1]])) %>% 
-   rbind(cbind(model$IVdata,type="real"))
+   rbind(cbind(IVdata$subject,type="real"))
    
 ```
 
 ```{r condDataSs}
- condData <- LB4L_conditional(LB4L_allSs)$subject %>% 
-   filter(!is.na(final_acc), !is.na(merged_prac_score))
- condData <- condData  %>% 
+ condData <- LB4L_conditional(LB4L_allSs)
+ condData_all <- condData$subject %>% 
+   filter(!is.na(final_acc), !is.na(merged_prac_score)) %>% 
    mutate(type='model') %>% 
    group_by(subject) %>%
    mutate(final_acc = replace(final_acc, practice=='C' & merged_prac_score == 1,
@@ -67,23 +77,25 @@ IVdata <- model$IVdata %>%
                               preds$Tplus[subject[1]]),
           final_acc = replace(final_acc, practice=='T' & merged_prac_score == 0,
                               preds$Tneg[subject[1]])) %>% 
-      rbind(cbind(condData,type="real"))
+      rbind(cbind(condData$subject,type="real"))
 ```
    
 ```{r jointDataSs}   
-jointData <- model$jointData %>% 
+jointData_all <- jointData$subject %>% 
+   filter(final_score %in% 0:1, !is.na(merged_prac_score)) %>% 
    mutate(type = "model") %>%
    group_by(subject) %>%
-   mutate(prac_acc = replace(prac_acc, !is.na(prac_acc), 
-                             preds$prac[subject[1]]),
-          final_acc = replace(final_acc, practice=='C' & other_type!='T',
-                              preds$C[subject[1]]),
-          final_acc = replace(final_acc, practice=='S', preds$S[subject[1]]),
-          final_acc = replace(final_acc, practice=='T' & other_type!='C',
-                              preds$`T`[subject[1]]),
-          final_acc = replace(final_acc, practice=='C' & other_type=='T',
-                              preds$CT[subject[1]])) %>% 
-   rbind(cbind(model$IVdata,type="real"))
+   mutate(acc = replace(acc, practice=='C' & other_type=='T' ,
+                             c(preds$CT_not_prac_not_final[subject[1]],
+                               preds$CT_not_prac_final[subject[1]],
+                               preds$CT_prac_not_final[subject[1]],
+                               preds$CT_prac_final[subject[1]])),
+          acc = replace(acc, practice=='T' & is.na(other_type),
+                             c(preds$T_not_prac_not_final[subject[1]],
+                               preds$T_not_prac_final[subject[1]],
+                               preds$T_prac_not_final[subject[1]],
+                               preds$T_prac_final[subject[1]]))) %>%                  
+   rbind(cbind(jointData$subject,type="real"))
     
 ```
 
