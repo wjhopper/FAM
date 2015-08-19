@@ -40,11 +40,14 @@ rawData$final_score[rawData$practice %in% "T" & rawData$other_type %in% "C"]  <-
 
 
 # set data types so we know what to expect elsewhere
-cols <- colnames(LB4L_allSs) %in% c("subject","list","practice","repeating","target")
-LB4L_allSs[cols] <- lapply(LB4L_allSs[cols], factor)
-LB4L_allSs$group <- factor(LB4L_allSs$group, levels = c("immediate", "delay"))
-LB4L_allSs$other_type <- factor(LB4L_allSs$other_type,exclude = NULL)
+cols <- colnames(rawData) %in% c("subject","list","practice","repeating","target")
+rawData[cols] <- lapply(rawData[cols], factor)
+rawData$group <- factor(rawData$group, levels = c("immediate", "delay"))
+rawData$other_type <- factor(rawData$other_type,exclude = NULL)
 
 # Save as binary rda
-# save(rawData, file = file.path("data","LB4L_allSs.rda"))
+# LB4L_allSs <- rawData
+# save(LB4L_allSs, file = file.path("data","LB4L_allSs.rda"))
+# or
+# devtools::use_data(LB4L_allSs)
 
