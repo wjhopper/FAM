@@ -31,8 +31,8 @@ Start by removing any subjects with less than 5% accuracy across all conditions.
 ```{r removeBaddies} 
   subject_means <- badSubs(LB4L_allSs)
   print(subject_means$removed)
-  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% subject_means$removed)) %>%
-    droplevels()
+  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% subject_means$removed))
+  LB4L_allSs$subject <- factor(LB4L_allSs$subject)
 ```
 
 
