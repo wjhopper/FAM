@@ -83,6 +83,8 @@ CFRcleaned <- filter(rawData,any(score == 2)) %>%
 #   it matches 'tail' not cottage, set it to 1
 # Note: I know from visual inspection that "flooe" (row 45) is a duplicate
 #   of "floor" in the same list", set it to 0
+# Note: I know from visual inspection that "canon" (row 73) is a duplicate
+#   of "cannon" in the same list", set it to 0
 
 
 # Replace the fuzzy matches with the manual decisions
