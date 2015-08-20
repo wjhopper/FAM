@@ -61,7 +61,7 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10, lambda=.
                              RTdis(restudy$RT, restudy$order, p['Time']),
                              RTdis(tested$RT, tested$order, p['Time']),
                              row.names = NULL))
-    err <- LL(obs=data[,c("class","ls_order","RTrounded")],pred = dist)
+    err <- LL(obs=data[,c("class","order","RTrounded")],pred = dist)
 
   } else if (fitAcc) {
     acc <-rbind(prac$Acc,restudy$Acc,tested$Acc)
@@ -90,7 +90,8 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10, lambda=.
     preds$class <- rep(rep(c("np","sp","tp"),each = nrow(prac$Acc)),ncol(prac$Acc))
 
     if (fitRT) {
-      return(list(err=err,preds=preds,dist = dist))
+      return(list(err=err,preds=preds,
+                  dist = cbind(subject = data$subject[1], dist)))
     } else {
       return(list(err=err,preds=preds))
     }

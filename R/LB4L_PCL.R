@@ -39,7 +39,7 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
     }
   }
 
-  checkRequiredParams(model, fcn)
+  checkRequiredParams(c(model$par,model$fixed), model$fn)
 #   if (debugLevel[1]>0){
 #     trace(model$fn, browser, at=debugLevel[2])
 # #     setBreakpoint('PCL.R', debugLevel[2], envir = environment())
@@ -94,13 +94,13 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
     untrace(PCL)
   }
 
-  resultsFile <- paste(model$objective_fcn, model$name, 'results',sep='_')
-  assign(resultsFile, model[c("results","objective_fcn","fixed","par")])
+#   resultsFile <- paste(model$objective_fcn, model$name, 'results',sep='_')
+#   assign(resultsFile, model[c("results","objective_fcn","fixed","par")])
 #   save(list = resultsFile,
 #        file = file.path("data",paste(model$objective_fcn,
 #                                      model$name, 'results.rda',
 #                                      sep='_')))
-  return(eval(parse(text = resultsFile)))
+  return(model)
 }
 
 
