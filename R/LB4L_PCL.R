@@ -94,13 +94,13 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
     untrace(PCL)
   }
 
-  resultsFile <- paste(paste0(model_prefix, collapse = "_"),
-                       'results',sep='_')
-  assign(resultsFile, model[c("results","objective_fcn")])
-  save(list = resultsFile,
-       file = file.path("data",paste(paste0(model_prefix, collapse = "_"),
-                                     'results.rda',sep='_')))
-  return(model$results)
+  resultsFile <- paste(model$objective_fcn, model$name, 'results',sep='_')
+  assign(resultsFile, model[c("results","objective_fcn","fixed","par")])
+#   save(list = resultsFile,
+#        file = file.path("data",paste(model$objective_fcn,
+#                                      model$name, 'results.rda',
+#                                      sep='_')))
+  return(eval(parse(text = resultsFile)))
 }
 
 
@@ -179,17 +179,17 @@ LB4L_PCLss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                       CT = testOCAcc,
                       CTplus = testOCAcc[prac],
                       CTneg = testOCAcc[!prac],
-                      CT_prac_final = (prac & testOCAcc),
-                      CT_prac_not_final = (prac & !testOCAcc),
-                      CT_not_prac_final = (!prac & testOCAcc),
                       CT_not_prac_not_final = (!prac & !testOCAcc),
+                      CT_not_prac_final = (!prac & testOCAcc),
+                      CT_prac_not_final = (prac & !testOCAcc),
+                      CT_prac_final = (prac & testOCAcc),
                       `T` = testAcc,
                       Tplus = testAcc[prac],
                       Tneg = testAcc[!prac],
-                      T_prac_final = (prac & testAcc),
-                      T_prac_not_final = (prac & !testAcc),
+                      T_not_prac_not_final = (!prac & !testAcc),
                       T_not_prac_final = (!prac & testAcc),
-                      T_not_prac_not_final = (!prac & !testAcc)),
+                      T_prac_not_final = (prac & !testAcc),
+                      T_prac_final = (prac & testAcc)),
                  mean)
 
   preds <- unlist(avgs)
