@@ -64,8 +64,7 @@ print(sub_means_plot)
 
 
 ## Subject Performance 
-
-```{r allSubjects}
+```{r allSubjects,results='asis'}
 
 IVsummary <- LB4L_IV(LB4L_allSs)
 IVss <- melt(IVsummary$subject,
