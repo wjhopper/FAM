@@ -4,22 +4,22 @@
 \alias{LB4L_PCLss}
 \title{Title}
 \usage{
-LB4L_PCLss(free = c(ER = 0.53, LR = 0.15, TR = 0.1, F1 = 0.1, space = 0.03),
+LB4L_PCLss(free = c(ER = 0.52, LR = 0.2, TR = 0.03, F1 = 0.05, space = 0.03),
   fixed = c(theta = 0.5, nFeat = 100, nSim = 1000, nList = 15, Tmin = NA, Tmax
-  = NA, lambda = NA, Time = NA), IVdata = LB4L_IV(LB4L_allSs)$subject,
-  condData = LB4L_conditional(LB4L_allSs)$subject,
-  jointData = LB4L_joint(LB4L_allSs)$subject, fitting = FALSE)
+  = NA, lambda = NA, Time = NA), IVdata = filter(LB4L_IV(LB4L_allSs)$subject,
+  subject == 17), jointData = filter(LB4L_joint(LB4L_allSs)$subject, subject
+  == 17), fitting = FALSE, ...)
 }
 \arguments{
 \item{free}{Named vector of free parameters. See Details for possible names.}
 
 \item{fixed}{Named vector of free parameters. See Details for possible names.}
 
+\item{IVdata}{}
+
 \item{fitting}{Controls  the return value.  See Value for details.}
 
-\item{data}{Not really useful to change}
-
-\item{data}{Not really useful to change}
+\item{jointdata}{}
 }
 \value{
 If \code{fitting = TRUE}, scalar vector is returned,

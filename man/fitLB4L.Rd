@@ -4,7 +4,7 @@
 \alias{fitLB4L}
 \title{Title}
 \usage{
-fitLB4L(model, inpar = TRUE, debugLevel = 0)
+fitLB4L(model, inpar = FALSE, debugLevel = 0)
 }
 \arguments{
 \item{model}{}
