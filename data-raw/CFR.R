@@ -53,7 +53,8 @@ rawData$subject[rawData$subject==55] <- 20
 rawData <- arrange(rawData, subject) %>%
   group_by(subject,list,phase) %>%
   mutate(practice = practice[1],
-         ls_order = 1:n()) %>% ungroup() %>%
+         order = 1:n()) %>%
+  ungroup() %>%
   mutate(onset = replace(onset, !is.finite(onset) | onset ==0, NA),
          FP = replace(FP, !is.finite(FP) | FP ==0, NA),
          LP = replace(LP, !is.finite(LP) | LP ==0, NA),
