@@ -73,16 +73,19 @@ rawData <- arrange(rawData, subject) %>%
            score(target,resp,checkDuplicates = TRUE,
                  ignoreVals=NA,index.return = TRUE)$position
          })
-cleaned <- filter(rawData,any(score == 2)) %>%
+CFRcleaned <- filter(rawData,any(score == 2)) %>%
   select(subject,target,resp, score, where) %>%
   mutate(target = target[where]) %>%
   filter(score %in% 2) %>%
   edit()
-# Note: I know from visual inspection that 'tale' (row 24) is correct, it matches 'tail' not cottage
+# Note: I know from visual inspection that 'tale' (row 24) is correct
+#   it matches 'tail' not cottage, set it to 1
+# Note: I know from visual inspection that "flooe" (row 45) is a duplicate
+#   of "floor" in the same list", set it to 0
 
 
 # Replace the fuzzy matches with the manual decisions
-rawData$score[rawData$score %in% 2] <- cleaned$score
+rawData$score[rawData$score %in% 2] <- CFRcleaned$score
 
 rawData <- rawData %>%
   group_by(subject,list,phase) %>%
