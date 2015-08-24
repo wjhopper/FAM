@@ -6,8 +6,9 @@
 \usage{
 CFR_PCL(free = c(ER = 0.53, LR = 0.3, TR = 0.3, FR = 0.1, Tmin = 2, Tmax = 10,
   lambda = 0.8), fixed = c(theta = 0.5, nFeat = 100, nSim = 1000, nList = 15,
-  Time = 90), data = CFR_allSs, fitRT = TRUE, fitAcc = FALSE,
-  fittting = FALSE)
+  Time = 90), data = filter(CFR_allSs, subject == 1, phase == "final" | (phase
+  == "prac" & practice == "T")) \%>\% mutate(RTrounded = round(RT, 1)),
+  fitRT = TRUE, fitAcc = FALSE, fitting = FALSE)
 }
 \arguments{
 \item{free}{}
