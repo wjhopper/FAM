@@ -28,7 +28,10 @@ IVsummary <- function(data,
   summary <- data %>%
     group_by_(.dots = grouping.vars)  %>%
     summarise_each_(fn, measure.vars)
-  return(summary)
+  return(data.frame(summary,
+                    n =  data %>%
+                      group_by_(.dots = grouping.vars) %>%
+                      group_size()))
 }
 
 #' @export
