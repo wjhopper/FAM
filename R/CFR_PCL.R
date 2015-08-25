@@ -19,7 +19,7 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
 
   p <- c(free,fixed)
   if (!paramBounds(p)) {
-    return(1000000)
+    stop("Parameter out of allowed range")
   }
 
   set.seed(456)
