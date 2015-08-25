@@ -11,7 +11,8 @@
 #' @import reshape2
 #' @export
 #'
-CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10, lambda=.8),
+CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10, lambda=.8,
+                            alpha = 13),
                 fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
                 data= filter(CFR_allSs, subject == 1,
                              phase=='final' | (phase=='prac' & practice =='T')) %>%
@@ -31,11 +32,21 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10, lambda=.
   set.seed(456)
   mxn <-  p['nSim']*p['nList'] #dimensions precalculation
 
-  # initial learning
-  mem <- matrix(rbinom(mxn,p['nFeat'], p['ER']),
+  if (!is.na(p['alpha'])) {
+    p['beta'] <- (p['alpha']/p['ER']) - p['alpha']
+
+    # get the list-wise encoding rates from beta hyper distribution
+    ERates <- matrix(rbeta(n = p['nSim'],p['alpha'],p['beta']),
                      nrow=p['nSim'],ncol=p['nList'])
+  } else {
+    ERrates <- p['ER']
+    # initial learning
+  }
+
+  mem <- matrix(rbinom(mxn,p['nFeat'], ERates),
+                nrow=p['nSim'],ncol=p['nList'])
   thresh <- matrix(rbinom(mxn,p['nFeat'], p['theta']),
-                        nrow=p['nSim'],ncol=p['nList'])
+                   nrow=p['nSim'],ncol=p['nList'])
 
   #practice test
   prac <- freeRecall(mem,thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
