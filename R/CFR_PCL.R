@@ -14,7 +14,8 @@
 #'
 CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
                             lambda=.8, alpha = 13),
-                fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90)) {
+                    fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
+                    return_dist=TRUE) {
 
   p <- c(free,fixed)
   if (!paramBounds(p)) {
@@ -72,7 +73,7 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
     group_by(class,order) %>%
     summarise(acc = mean(acc),
               RT = median(RT,na.rm = TRUE))
-  if (anyNA(p[c("Tmin","Tmax","theta","Time")])) {
+  if (!anyNA(p[c("Tmin","Tmax","theta","Time")]) && return_dist)   {
     return(preds = preds)
   } else {
     dist <- data.frame(class = rep(c('np','sp','tp'),each=13500), # 13500 = 15 items * 900 points
