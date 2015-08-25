@@ -43,10 +43,14 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                       acc = pracC1, LR = p['LR'], TR = p['TR'])
   T2strengths<- test(mem = memC2, nFeatures=p['nFeat'], thresh = thresh,
                      acc = pracC2, LR = p['LR'], TR = p['TR'], FR = p['F1'])
+
+  # Conditions 5 and 6 T_ and _T
   T1 <- cuedRecall(T1strengths$mem, T1strengths$thresh, p['space'])
   T2 <- cuedRecall(T2strengths$mem, T2strengths$thresh, p['space'])
+
   TTstrengths <- test(mem = T1strengths$mem, nFeatures=p['nFeat'],thresh = T1strengths$thresh,
                       acc = T1, LR = p['LR'], TR = p['TR'])
+  pracTT <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
 
   # Conditions 1 and 2 C_ and _C
   C1 <- pracC1
@@ -55,11 +59,6 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   # Conditions 3 and 4 S_ and _S
   S1 <- cuedRecall(S1strengths,thresh, p['space'])
   S2 <- cuedRecall(S2strengths,thresh, p['space'])
-
-
-  # Conditions 5 and 6 T_ and _T
-  T1 <- T1
-  T2 <- T2
 
   # Conditions 7 and 8 C^C and CC^
   CC1 <- pracC1
@@ -70,7 +69,7 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   CS2 <- S2
 
   # Conditions 11 and 12 C^T and CT^
-  CT1 <- cuedRecall(mem = memC1,thresh = T1strengths$thresh,p['space'])
+  CT1 <- cuedRecall(mem = memC1,thresh = T2strengths$thresh,p['space'])
   CT2 <- T2
 
   # Conditions 13 and 14 S^C and SC^
@@ -94,8 +93,10 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   TS2 <- cuedRecall(mem = S2strengths,thresh = T1strengths$thresh,p['space'])
 
   # Conditions 23 and 24 T^T and TT^
-  TT1 <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
-  TT2 <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
+  TT1 <- T1
+  TT2 <- T2
+#   TT1 <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
+#   TT2 <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
 
 
   # Average over simulations
@@ -124,7 +125,7 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                       TC1plus = TC1[pracC1], TC1neg = TC1[!pracC1],
                       TC1_p_f = (pracC1 & TC1), TC1_p_nf =  (pracC1 & !TC1),
                       TC1_np_f = (!pracC1 & TC1), TC1_np_nf = (!pracC1 & !TC1),
-                      TS1 = TC1, TS2 = TS2,
+                      TS1 = TS1, TS2 = TS2,
                       TS1plus = TS1[pracC1], TS1neg = TS1[!pracC1],
                       TS1_p_f = (pracC1 & TS1), TS1_p_nf =  (pracC1 & !TS1),
                       TS1_np_f = (!pracC1 & TS1), TS1_np_nf = (!pracC1 & !TS1),
@@ -132,7 +133,7 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                       TT1plus = TT1[pracC1], TT1neg = TT1[!pracC1],
                       TT1_p_f = (pracC1 & TT1), TT1_p_nf =  (pracC1 & !TT1),
                       TT1_np_f = (!pracC1 & TT1), TT1_np_nf = (!pracC1 & !TT1),
-                      TT2plus = TT2[pracC1], TT2neg = TT2[!pracC2],
+                      TT2plus = TT2[pracC2], TT2neg = TT2[!pracC2],
                       TT2_p_f = (pracC2 & TT2), TT2_p_nf =  (pracC2 & !TT2),
                       TT2_np_f = (!pracC2 & TT2), TT2_np_nf = (!pracC2 & !TT2)),
                  mean)
