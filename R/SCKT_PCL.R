@@ -1,6 +1,6 @@
 
 #' @export
-SCKT_PCLss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
+SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                        fixed = c(theta=.5,nFeat=100,nSim=1000,
                                  nList=48,Tmin=NA, Tmax=NA, lambda=NA,Time=NA)) {
 
@@ -124,7 +124,7 @@ SCKT_PCLss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                       TC1plus = TC1[pracC1], TC1neg = TC1[!pracC1],
                       TC1_p_f = (pracC1 & TC1), TC1_p_nf =  (pracC1 & !TC1),
                       TC1_np_f = (!pracC1 & TC1), TC1_np_nf = (!pracC1 & !TC1),
-                      TS1 = TC1, TS2 = TC2,
+                      TS1 = TC1, TS2 = TS2,
                       TS1plus = TS1[pracC1], TS1neg = TS1[!pracC1],
                       TS1_p_f = (pracC1 & TS1), TS1_p_nf =  (pracC1 & !TS1),
                       TS1_np_f = (!pracC1 & TS1), TS1_np_nf = (!pracC1 & !TS1),
