@@ -9,24 +9,16 @@
 #'
 #' @importFrom KernSmooth bkde
 #' @import reshape2
+#' @import dplyr
 #' @export
 #'
-CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10, lambda=.8,
-                            alpha = 13),
-                fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
-                data= filter(CFR_allSs, subject == 1,
-                             phase=='final' | (phase=='prac' & practice =='T')) %>%
-                               mutate(RTrounded = round(RT,1)),
-                fitRT=TRUE, fitAcc=FALSE, fitting = FALSE) {
+CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
+                            lambda=.8, alpha = 13),
+                fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90)) {
+
   p <- c(free,fixed)
   if (!paramBounds(p)) {
     return(1000000)
-  }
-
-  if (all(fitRT,fitAcc)) {
-    stop("Can't fit accuracy and RT in same run, set fitRT or fitAcc to FALSE")
-  } else if (all(!fitRT, !fitAcc)) {
-    stop("Either fitRT or fitAcc must be set to TRUE")
   }
 
   set.seed(456)
@@ -66,46 +58,29 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10, lambda=.
                      Tmin = p['Tmin'], Tmax = p['Tmax'],
                      Time = p['Time'], lambda=p['lambda'])
 
-  if (fitRT) {
-    dist <- data.frame(class = rep(c('np','sp','tp'),each=13500), # 40500 = 15 items * 900 points
+  RT <-rbind(prac$RT,restudy$RT,tested$RT)
+  order <- rbind(prac$order,restudy$order,tested$order)
+  RT <-t(sapply(seq(nrow(RT)),
+                function(x) c(RT[x, order[x,][!is.na(RT[x,order[x,]])]],
+                              RT[x, order[x,][is.na(RT[x,order[x,]])]])))
+  acc <-melt(!is.na(RT), varnames=c("class","order"),value.name = "acc")
+  RT <- melt(RT, varnames=c("class","order"),value.name = "RT")
+  preds <- left_join(acc,RT) %>%
+    mutate(class =  rep(rep(c("np","sp","tp"),
+                            each = nrow(prac$Acc)),
+                        ncol(prac$Acc))) %>%
+    group_by(class,order) %>%
+    summarise(acc = mean(acc),
+              RT = median(RT,na.rm = TRUE))
+  if (anyNA(p[c("Tmin","Tmax","theta","Time")])) {
+    return(preds = preds)
+  } else {
+    dist <- data.frame(class = rep(c('np','sp','tp'),each=13500), # 13500 = 15 items * 900 points
                        rbind(RTdis(prac$RT, prac$order, p['Time']),
                              RTdis(restudy$RT, restudy$order, p['Time']),
                              RTdis(tested$RT, tested$order, p['Time']),
-                             row.names = NULL))
-    err <- LL(obs=data[,c("class","order","RTrounded")],pred = dist)
-
-  } else if (fitAcc) {
-    acc <-rbind(prac$Acc,restudy$Acc,tested$Acc)
-    order <- rbind(prac$order,restudy$order,tested$order)
-    acc <-t(sapply(seq(nrow(acc)),
-                   function(x) c(acc[x, order[x,][!is.na(acc[x,order[x,]])]],
-                                 acc[x, order[x,][is.na(acc[x,order[x,]])]])
-    )) %>%
-      melt(varnames=c("class","order"),value.name = "pred_acc") %>%
-      mutate(class = rep(rep(c("np","sp","tp"),each = nrow(prac$Acc)),ncol(prac$Acc)))
-    err <- SSE(obs=data, pred  = acc )
-  }
-
-  if (fitting) {
-    return(err)
-  } else {
-    RT <-rbind(prac$RT,restudy$RT,tested$RT)
-    order <- rbind(prac$order,restudy$order,tested$order)
-    RT <-t(sapply(seq(nrow(RT)),
-                  function(x) c(RT[x, order[x,][!is.na(RT[x,order[x,]])]],
-                                RT[x, order[x,][is.na(RT[x,order[x,]])]])
-    ))
-    acc <-melt(!is.na(RT), varnames=c("class","order"),value.name = "pred_acc")
-    RT <- melt(RT, varnames=c("class","order"),value.name = "pred_RT")
-    preds <- data.frame(subject = data$subject[1],left_join(acc,RT))
-    preds$class <- rep(rep(c("np","sp","tp"),each = nrow(prac$Acc)),ncol(prac$Acc))
-
-    if (fitRT) {
-      return(list(err=err,preds=preds,
-                  dist = cbind(subject = data$subject[1], dist)))
-    } else {
-      return(list(err=err,preds=preds))
-    }
+                       row.names = NULL))
+    return(list(preds = preds,distribution = dist))
   }
 }
 
