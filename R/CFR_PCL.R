@@ -32,7 +32,7 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
     ERates <- matrix(rbeta(n = p['nSim'],p['alpha'],p['beta']),
                      nrow=p['nSim'],ncol=p['nList'])
   } else {
-    ERrates <- p['ER']
+    ERates <- p['ER']
     # initial learning
   }
 
@@ -74,14 +74,14 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
     summarise(acc = mean(acc),
               RT = median(RT,na.rm = TRUE))
   if (!anyNA(p[c("Tmin","Tmax","theta","Time")]) && return_dist)   {
-    return(preds = preds)
-  } else {
     dist <- data.frame(class = rep(c('np','sp','tp'),each=13500), # 13500 = 15 items * 900 points
                        rbind(RTdis(prac$RT, prac$order, p['Time']),
                              RTdis(restudy$RT, restudy$order, p['Time']),
                              RTdis(tested$RT, tested$order, p['Time']),
                        row.names = NULL))
     return(list(preds = preds,distribution = dist))
+  } else {
+    return(preds = preds)
   }
 }
 
