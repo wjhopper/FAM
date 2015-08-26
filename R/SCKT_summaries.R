@@ -37,25 +37,26 @@ IVsummary <- function(data,
 #' @export
 SCKT_condSummary <- function(data) {
   CDxSS <-SCKT_allSs %>%
-    group_by(subject, cluster, half, practice, other_type,prac_score) %>%
+    group_by(subject, half, practice, other_type, prac_score,other_prac) %>%
     summarise(count = n(),
               final_acc=mean(final_score)) %>%
     ungroup() %>%
-    complete(c(subject,cluster), half,c(practice,other_type,prac_score))
+    complete(c(subject), half,c(practice,other_type,prac_score,other_prac),
+             fill=list(count=0))
 
   CDxCluster <-SCKT_allSs %>%
-    group_by(cluster, half, practice, other_type,prac_score) %>%
+    group_by(cluster, half, practice, other_type,prac_score,other_prac) %>%
     summarise(count = n(),
               final_acc=mean(final_score)) %>%
     ungroup() %>%
-    complete(cluster, half,c(practice,other_type,prac_score))
+    complete(cluster, half,c(practice,other_type,prac_score,other_prac))
 
   CD <- SCKT_allSs %>%
-    group_by(half, practice, other_type,prac_score) %>%
+    group_by(half, practice, other_type,prac_score,other_prac) %>%
     summarise(count = n(),
               final_acc=mean(final_score)) %>%
     ungroup() %>%
-    complete(half,c(practice,other_type,prac_score))
+    complete(half,c(practice,other_type,prac_score,other_prac))
 
   return(list(subject=CDxSS, clusters = CDxCluster, group = CD))
 }
@@ -98,4 +99,16 @@ SCKT_jointSummary <- function(data) {
     mutate(cell_percent = cell_count/maxCount)
 
   return(list(subject= JDxSS, clusters = JDxCluster, group=JD))
+}
+
+#' @export
+recode_other_type <- function(data){
+  new <- data %>%
+    mutate(prac_named = factor(other_prac,
+                               labels = c(`0`='neg',`1`='plus',`NA`=''),
+                               exclude = NULL),
+           other_type = paste(other_type,prac_named,sep='')) %>%
+    select(-prac_named)
+  return(new)
+
 }

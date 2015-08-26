@@ -128,19 +128,21 @@ pander(summary(aov.1),justify='left',table.split.table=Inf)
 ```
 
 ## Conditional Analysis
-```{r conditional}
+```{r conditional, fig.width= 9}
 # SCKT_allSs$prac_score <- factor(SCKT_allSs$prac_score)
 
 # selected only tested cue/targets pairs
 condData <- SCKT_condSummary(SCKT_allSs)
 
 condPlot <- ggplot(mutate(condData$group,
-                          prac_score = replace(prac_score,is.na(prac_score),-1)),
+                          prac_score = replace(prac_score,is.na(prac_score),-1)) %>%
+                     recode_other_type(),
                    aes(x=practice,y=final_acc,fill=factor(prac_score))) +
   geom_bar(position='dodge',stat="identity",drop=F) +
   facet_grid(other_type~half,
              labeller = labeller(half=label_both,
-                                 other_type = c('T'='Tested',
+                                 other_type = c('Tneg'='Tested: Incorrect',
+                                                'Tplus'='Tested: Correct',
                                                 "S"="Studied",
                                                 "C" = "No Practice"))) +
   scale_fill_manual("Practice Test",

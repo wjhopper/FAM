@@ -5,19 +5,17 @@
 \title{CFR_PCL}
 \usage{
 CFR_PCL(free = c(ER = 0.53, LR = 0.3, TR = 0.3, FR = 0.1, Tmin = 2, Tmax = 10,
-  lambda = 0.8), fixed = c(theta = 0.5, nFeat = 100, nSim = 1000, nList = 15,
-  Time = 90), data = filter(CFR_allSs, subject == 1, phase == "final" | (phase
-  == "prac" & practice == "T")) \%>\% mutate(RTrounded = round(RT, 1)),
-  fitRT = TRUE, fitAcc = FALSE, fitting = FALSE)
+  lambda = 0.8, alpha = 13), fixed = c(theta = 0.5, nFeat = 100, nSim = 1000,
+  nList = 15, Time = 90), return_dist = TRUE)
 }
 \arguments{
 \item{free}{}
 
 \item{fixed}{}
 
-\item{data}{}
-
 \item{yoke}{}
+
+\item{data}{}
 
 \item{fittingRT}{}
 
