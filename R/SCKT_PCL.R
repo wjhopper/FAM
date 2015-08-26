@@ -2,11 +2,11 @@
 #' @export
 SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                        fixed = c(theta=.5,nFeat=100,nSim=1000,
-                                 nList=48,Tmin=NA, Tmax=NA, lambda=NA,Time=NA)) {
+                                 nList=4,Tmin=NA, Tmax=NA, lambda=NA,Time=NA)) {
 
   p <- c(free,fixed)
   if (!paramBounds(p)) {
-    return(1000000)
+    stop("Parameters out of bounds")
   }
   set.seed(456)
   mxn <-  p['nSim']*p['nList'] #dimensions precalculation
@@ -27,16 +27,13 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   pracC1 <- cuedRecall(memC1,thresh, p['space'])
   pracC2 <- cuedRecall(memC2,thresh, p['space'])
 
-
-  #control, no practice
+  # no practice effects
   C1strengths <- memC1
   C2strengths <- memC2 - rbinom(mxn, memC2, p['F1'])
 
   # study practice effects
   S1strengths <- study(memC1, nFeatures=p['nFeat'], LR = p['LR'])
-  S2strengths <- study(memC2, nFeatures=p['nFeat'],
-                        LR = p['LR'], FR = p['F1'])
-  # Final test on study practiced items
+  S2strengths <- study(memC2, nFeatures=p['nFeat'], LR = p['LR'], FR = p['F1'])
 
   # test practice effects
   T1strengths <- test(mem = memC1, nFeatures=p['nFeat'],thresh = thresh,
@@ -48,12 +45,12 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   T1 <- cuedRecall(T1strengths$mem, T1strengths$thresh, p['space'])
   T2 <- cuedRecall(T2strengths$mem, T2strengths$thresh, p['space'])
 
-  TTstrengths <- test(mem = T1strengths$mem, nFeatures=p['nFeat'],thresh = T1strengths$thresh,
-                      acc = T1, LR = p['LR'], TR = p['TR'])
-  pracTT <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
+  TTstrengths <- test(mem = memC2, nFeatures=p['nFeat'],thresh = T1strengths$thresh,
+                      acc = T1, LR = p['LR'], TR = p['TR'],FR = p['F1'])
+  pracTT <- cuedRecall(T2strengths$mem, TTstrengths$thresh, p['space'])
 
   # Conditions 1 and 2 C_ and _C
-  C1 <- pracC1
+  C1 <- cuedRecall(C1strengths,thresh, p['space'])
   C2 <- cuedRecall(C2strengths,thresh, p['space'])
 
   # Conditions 3 and 4 S_ and _S
@@ -61,42 +58,40 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   S2 <- cuedRecall(S2strengths,thresh, p['space'])
 
   # Conditions 7 and 8 C^C and CC^
-  CC1 <- pracC1
-  CC2 <- C2
+  CC1 <- cuedRecall(C1strengths,thresh, p['space'])
+  CC2 <- cuedRecall(C2strengths,thresh, p['space'])
 
   # Conditions 9 and 10 C^S and CS^
-  CS1 <- pracC1
-  CS2 <- S2
+  CS1 <- cuedRecall(C1strengths,thresh, p['space'])
+  CS2 <- cuedRecall(S2strengths,thresh, p['space'])
 
   # Conditions 11 and 12 C^T and CT^
-  CT1 <- cuedRecall(mem = memC1,thresh = T2strengths$thresh,p['space'])
-  CT2 <- T2
+  CT1 <- cuedRecall(C1strengths, T2strengths$thresh,p['space'])
+  CT2 <- cuedRecall(T2strengths$mem, T2strengths$thresh, p['space'])
 
   # Conditions 13 and 14 S^C and SC^
-  SC1 <- S1
-  SC2 <- C2
+  SC1 <- cuedRecall(S1strengths,thresh, p['space'])
+  SC2 <-  cuedRecall(C2strengths,thresh, p['space'])
 
   # Conditions 15 and 16 S^S and SS^
-  SS1 <- S1
-  SS2 <- S2
+  SS1 <- cuedRecall(S1strengths,thresh, p['space'])
+  SS2 <- cuedRecall(S2strengths,thresh, p['space'])
 
   # Conditions 17 and 18 S^T and ST^
-  ST1 <- cuedRecall(mem = S1strengths,thresh = T2strengths$thresh,p['space'])
-  ST2 <- T2
+  ST1 <- cuedRecall(S1strengths, T2strengths$thresh,p['space'])
+  ST2 <- cuedRecall(T2strengths$mem, T2strengths$thresh, p['space'])
 
   # Conditions 19 and 20 T^C and TC^
-  TC1 <- T1
-  TC2 <- cuedRecall(mem = memC2,thresh = T1strengths$thresh,p['space'])
+  TC1 <- cuedRecall(T1strengths$mem, T1strengths$thresh, p['space'])
+  TC2 <- cuedRecall(C2strengths, T1strengths$thresh,p['space'])
 
   # Conditions 21 and 22 T^S and TS^
-  TS1 <- T1
-  TS2 <- cuedRecall(mem = S2strengths,thresh = T1strengths$thresh,p['space'])
+  TS1 <- cuedRecall(T1strengths$mem, T1strengths$thresh, p['space'])
+  TS2 <- cuedRecall(S2strengths, T1strengths$thresh,p['space'])
 
   # Conditions 23 and 24 T^T and TT^
-  TT1 <- T1
-  TT2 <- T2
-#   TT1 <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
-#   TT2 <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
+  TT1 <- cuedRecall(T1strengths$mem, TTstrengths$thresh, p['space'])
+  TT2 <- cuedRecall(TTstrengths$mem, TTstrengths$thresh, p['space'])
 
 
   # Average over simulations
@@ -133,9 +128,9 @@ SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                       TT1plus = TT1[pracC1], TT1neg = TT1[!pracC1],
                       TT1_p_f = (pracC1 & TT1), TT1_p_nf =  (pracC1 & !TT1),
                       TT1_np_f = (!pracC1 & TT1), TT1_np_nf = (!pracC1 & !TT1),
-                      TT2plus = TT2[pracC2], TT2neg = TT2[!pracC2],
-                      TT2_p_f = (pracC2 & TT2), TT2_p_nf =  (pracC2 & !TT2),
-                      TT2_np_f = (!pracC2 & TT2), TT2_np_nf = (!pracC2 & !TT2)),
+                      TT2plus = TT2[pracTT], TT2neg = TT2[!pracTT],
+                      TT2_p_f = (pracTT & TT2), TT2_p_nf =  (pracTT & !TT2),
+                      TT2_np_f = (!pracTT & TT2), TT2_np_nf = (!pracTT & !TT2)),
                  mean)
   return(avgs)
 
