@@ -1,3 +1,7 @@
+#' @import dplyr
+#' @importFrom lazyeval lazy_dots
+
+
 #' Hierarchical Summary
 #'
 #' Summarise a data frame at cascading levels of granularity
@@ -26,6 +30,7 @@
 #'                             weighted.mean(final_score,n), mean(final_score),
 #'                             n = sum(n))
 #' str(derp)
+#'
 heirarchicalSummary <- function(collapse, hold,
                                 rawData, ...) {
 
@@ -53,3 +58,45 @@ heirarchicalSummary <- function(collapse, hold,
   return(out[-1])
 
 }
+
+
+#' @export
+performanceBins <- function(data, bin_by,
+                            cutpoints = c(.25,.5,.75), ...) {
+
+  fcns <- lazyeval::lazy_dots(...)
+#   final_fns <- funs(n)
+#   final_names = paste("n",names(fcns),sep='.')
+#   names(final_fns) <- final_names
+  binned <- data %>%
+    group_by_(.dots = bin_by) %>%
+    summarise_(.dots=fcns) %>%
+    mutate_each_(funs(cut(., breaks = cutpoints, include.lowest=TRUE)),
+                 vars = names(fcns)) %>%
+    group_by_(.dots=names(fcns)) %>%
+    summarise(count=n(),percentage = count/nrow(data))
+
+}
+#
+#
+#   tm <- as.data.frame(xtabs( ~ bin,tailoring_means)) %>%
+#     mutate(Freq = Freq/sum(Freq))
+
+#   tailor_plot <- ggplot(tm, aes(x=bin,y=Freq)) +
+#     geom_bar(stat='identity') +
+#     scale_y_continuous("Proportion of Subjects", limits = c(0,max(tm$Freq+.025))) +
+#     geom_text(aes(label =c("6 Secs","5 secs","4 Secs"), y= Freq+.025)) +
+#     xlab("Practice List Performance") +
+#     theme_larger() +
+#     ggtitle('Percent of Subjects with Specific Performance Levels')
+#
+#   if (return.plot & return.data) {
+#     return(list(data = tm, figure = tailor_plot))
+#   } else if (return.plot & !return.data) {
+#     return(tailor_plot)
+#   } else if  (!return.plot & return.data) {
+#     return(tm)
+#   } else {
+#     return(invisible())
+#   }
+# }
