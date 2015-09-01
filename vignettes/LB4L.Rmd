@@ -79,16 +79,24 @@ print(sub_means_plot)
 ## Subject Performance 
 ```{r allSubjects,results='asis'}
 
-IVsummary <- LB4L_IV(LB4L_allSs)
+IVsummary <- heirarchicalSummary(collapse = c("subject","group"),
+                            hold =c("practice","other_type"),
+                            rawData = cbind(filter(LB4L_allSs,list !=1) ,n=1),
+                            w_prac_score = weighted.mean(prac_score,w=n),                            
+                            prac_score = mean(prac_score,na.rm=TRUE),
+                            w_final_score = weighted.mean(final_score,w=n),                         
+                            final_score = mean(final_score),
+                            n=sum(n))
+
+                            
 IVss <- melt(IVsummary$subject,
-             id.vars = c("subject","group","practice","other_type","chain"),
-             measure.vars = c("prac_acc","final_acc"),
+             id.vars = c("subject","group","practice","other_type"),
+             measure.vars = c("prac_score","final_score"),
              variable.name = "timepoint", value.name="acc")
-IVss$chain[IVss$chain==4] <- 1
 condSummary <- LB4L_conditional(LB4L_allSs)
 
 subs <- unique(LB4L_allSs$subject)
-for(i in subs) {
+for (i in subs) {
   
   IVplot <- ggplot(data= filter(IVss, subject==i, is.finite(acc)),
                    aes(x=timepoint,y=acc, color=chain, group =chain)) +
