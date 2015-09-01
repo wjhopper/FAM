@@ -88,7 +88,6 @@ IVsummary <- heirarchicalSummary(collapse = c("subject","group"),
                             final_score = mean(final_score),
                             n=sum(n))
 
-                            
 IVss <- melt(IVsummary$subject,
              id.vars = c("subject","group","practice","other_type"),
              measure.vars = c("prac_score","final_score"),
@@ -99,16 +98,19 @@ subs <- unique(LB4L_allSs$subject)
 for (i in subs) {
   
   IVplot <- ggplot(data= filter(IVss, subject==i, is.finite(acc)),
-                   aes(x=timepoint,y=acc, color=chain, group =chain)) +
+                   aes(x=timepoint,y=acc,
+                       color=strSort(interaction(practice,other_type)),
+                       group=strSort(interaction(practice,other_type)))) +
     geom_point(size=3) +    
     geom_line(size=.75) + 
     scale_x_discrete("Test",expand=c(0,.25),labels=c("Practice","Final")) + 
-    scale_color_discrete("Condition",labels = c("2 Cues\n #1=Tested, #2=Unpracticed",
-                                                "1 Cue, No Practice",
-                                                "1 Cue, Restudied",
-                                                "1 Cue, Tested")) + 
+    scale_color_discrete("Condition",
+                         breaks = c("C.T","C.NA","NA.S","NA.T"),
+                         labels = c(C.T = "2 Cues\n[Unpracticed, Tested]",
+                                    C.NA = "1 Cue, No Practice",
+                                    NA.S  = "1 Cue, Restudied",
+                                    NA.T = "1 Cue, Tested")) + 
     scale_y_continuous("Final Test Accuracy",limit=0:1) + 
-    theme_larger() + 
     theme(legend.key.height=unit(2,"line")) + 
     ggtitle('Test Accuracy')
 
@@ -127,10 +129,9 @@ for (i in subs) {
     scale_x_discrete("Final Test Cue", 
                      limits=c(NA,'T'),labels=c("Practiced","Unpracticed")) +
     scale_y_continuous("Final Test Accuracy",expand=c(0,.02)) +
-    theme_larger() + 
     ggtitle('Conditional Final Test Accuracy')
   
-    cat('<h4 class="subid">', subs[i], '</h4>')
+    cat('<h4 class="subid">', i, '</h4>')
     grid.arrange(IVplot, conPlot, ncol=2, nrow=1)
 }
 ```
@@ -141,11 +142,10 @@ missings <- condSummary$subject %>% filter(count == 0) %>%
   select(subject) %>% unique()
 p_missing <- nrow(missings)/length(unique(condSummary$subject$subject)) 
 
-IVgrouped <- melt(IVsummary$groups,
-                  id.vars = c("group","practice","other_type","chain"),
-                  measure.vars = c("prac_acc","final_acc"),
+IVgrouped <- melt(IVsummary$group,
+                  id.vars = c("group","practice","other_type"),
+                  measure.vars = c("prac_score","final_score"),
                   variable.name = "timepoint", value.name="acc")
-IVgrouped$chain[IVgrouped$chain==4] <- 1
 IVgrouped$timepoint <- factor(IVgrouped$timepoint,labels=c(1,2))
 #step two: add an unused level to this new factor
 IVgrouped$timepoint <- factor(IVgrouped$timepoint,levels =c(1,2,3))
@@ -153,30 +153,32 @@ IVgrouped$timepoint <- factor(IVgrouped$timepoint,levels =c(1,2,3))
 # (aka final test) become a 3 now
 IVgrouped$timepoint[IVgrouped$timepoint %in% 2
                     & IVgrouped$group == 'delay'] <- as.factor(3)
-levels(IVgrouped$other_type) <- list(T='T',C='C',none=NA)
+# levels(IVgrouped$other_type) <- list(T='T',C='C',none=NA)
 ```
 
 
 ## Averaged Results
 ```{r groupedPlots}
 IVaveragedPlot <- ggplot(filter(IVgrouped, is.finite(acc)) %>%
-                       mutate(group_del_to_imm = replace(group,
+                           mutate(del_to_imm = replace(group,
                                            which(group=='delay' & timepoint ==3),
-                                           'immediate'),
-                              group_imm_to_del = replace(group,
-                                           which(group=='immediate' & timepoint ==2),
-                                           'delay'),
-                grouping2 = interaction(group_imm_to_del,chain)),
-       aes(x=timepoint,color=chain, y=acc,ymax=.85,ymin=.15)) +
+                                           'immediate')),
+                         aes(x=timepoint, y=acc,ymax=.85,ymin=.15,
+                             color = strSort(interaction(practice,other_type)))) +
     geom_point(size=3) +
-    geom_line(aes(group = interaction(group_del_to_imm,chain)),size=.75) +
-    scale_color_discrete("Condition",labels = c("2 Cues\n #1=Tested , #2=Unpracticed",
-                                                "1 Cue, No Practice",
-                                                "1 Cue, Restudied",
-                                                "1 Cue, Tested")) + 
-    scale_x_discrete("Group",expand=c(0,.25),labels=c("Practice","Immediate","Delay")) + 
+    geom_line(aes(group = paste(del_to_imm,
+                                strSort(interaction(practice,other_type)),
+                                sep='.')),
+              size=.75) +
+        scale_color_discrete("Condition",
+                         breaks = c("C.T","C.NA","NA.S","NA.T"),
+                         labels = c(C.T = "2 Cues\n[Unpracticed, Tested]",
+                                    C.NA = "1 Cue, No Practice",
+                                    NA.S  = "1 Cue, Restudied",
+                                    NA.T = "1 Cue, Tested")) + 
+    scale_x_discrete("Group",expand=c(0,.25),
+                     labels=c("Practice","Immediate","Delay")) + 
     ylab("Final Test Accuracy") + 
-    theme_larger() +
     theme(legend.key.height=unit(2,"line")) + 
     ggtitle('Cued Recall Accuracy')
 
@@ -201,7 +203,6 @@ condAvergedPlot <- ggplot(filter(condSummary$groups,merged_prac_score %in% 0:1),
   scale_x_discrete("Final Test Cue", limits=c(NA,'T'),
                    labels=c("Practiced","Unpracticed")) +
   scale_y_continuous("Final Test Accuracy",expand=c(0,.02)) +
-  theme_larger() +
   ggtitle('Conditional Final Test Accuracy For Tested Items')
 
   grid.arrange(IVaveragedPlot, condAvergedPlot, ncol=1,nrow=2)
@@ -251,7 +252,6 @@ mean_of_logs_plot <- ggplot(conAcc_grouped_log, aes(x = group, y= odds,fill=prac
                     palette="Set1",drop=F) +
   scale_x_discrete("Group",labels = c("Immediate","Delayed")) +
   ylab("Log Odds Ratio") +
-  mytheme +
   ggtitle('Diagnosticity of Practice Accuracy')
 
 ```
