@@ -1,0 +1,89 @@
+---
+title: "'Cummulative Free Recall' Performance Analysis"
+author: "Will Hopper"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    fig_caption: yes
+    toc: true
+    toc_depth: 2
+    css: custom.css
+vignette: >
+  %\VignetteIndexEntry{CFR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r knitr_setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
+library(whoppeR)
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(FAM)
+library(grid)
+library(gridExtra)
+library(wesanderson)
+library(tidyr)
+knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE, 
+               warning=F, message=FALSE, fig.align='center')
+```
+
+```{r testonlyData}
+CFR_tested <- filter(CFR_allSs,
+                     list != 0, (score %in% 1 | intrusions %in% 1 | repeats %in% 1),
+                     phase=='final' | (phase=='prac' & practice =='T')) %>%
+    group_by(subject,phase,list) %>%
+    mutate(testOrder = 1:n())
+
+```
+
+## Subject Performance 
+Left figure shows counts of correct recalls, repeats of correct recalls, and extra
+list intrusions for each list by each type of list (study practice, test practice, no practice). Perfect performance is 15/15 correct. 
+
+Right figure shows latency in seconds to pressing the first key when typing in the word, relative to the last key press of the previous word (or onset of the trial in the case of the first word.) Violin plots are gaussian kernel density estimates of the RT's, bandwidth of 1. 
+
+```{r subject,results='asis'}
+accData <-CFR_tested  %>% group_by(subject,class,phase,practice,cond_list) %>%
+  summarise(score=sum(score),
+            intrusions = sum(intrusions),
+            repeats = sum(repeats)) %>%
+  melt(id.vars = c("subject","phase","cond_list","class"),
+       measure.vars = c("score","intrusions","repeats"),
+       value.name="count")
+ymax <- max(CFR_tested$testOrder)
+
+timeData <- CFR_tested %>% filter(score %in% 1) %>%
+  group_by(subject,phase,list) %>% 
+  mutate(RT = FP-lag(LP),
+         RT= replace(RT,is.na(RT),FP[is.na(RT)]-onset[is.na(RT)]),
+         CRT=cumsum(RT))
+
+for (i in unique(CFR_tested$subject)){
+  subAcc <- ggplot(data = filter(accData,subject ==i),
+                   aes(x= cond_list, y=count,fill=variable)) +
+    geom_bar(stat="identity") +
+    facet_grid(class~.) +
+    scale_y_continuous(limits=c(0,ymax)) + 
+    scale_fill_manual("Response Type",
+                      breaks= c("score","repeats","intrusions"),
+                      labels =c(score = "Correct",
+                                intrusions = "Intrusions",
+                                repeats = "Repeated"),
+                      values = wes_palette("Darjeeling")) +
+    xlab("List")
+  
+
+  subTime <- ggplot(data = filter(timeData,subject==i),
+                    aes(x = factor(cond_list),y=RT)) +
+    geom_violin() +
+    geom_point() +
+    facet_grid(class~.) +
+    xlab("List")
+    
+
+  cat('<h4 class="subid">', paste("Subject", i), '</h4>')
+  grid.arrange(subAcc,subTime,ncol=2,nrow=1)
+
+}
+
+```
