@@ -49,12 +49,12 @@ heirarchicalSummary <- function(collapse, hold,
     proposed_names[!unnamed_fncs] <- names(fcns)[!unnamed_fncs]
     fcns <- setNames(fcns,proposed_names)
   }
-
+  fcns <- c(fcns, lazyeval::lazy_dots(groupsize=n()))
   index <- mapply(seq, 1:length(collapse), length(collapse))
   gvars <- lapply(index,function(x) c(collapse[x], hold))
   out <- Reduce(summaryFcn, x = c(list(rawData),gvars), accumulate = TRUE)
-  return(out[-1])
-
+  out <- setNames(out[-1], collapse)
+  return(out)
 }
 
 
