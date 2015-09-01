@@ -1,10 +1,8 @@
 #' @import dplyr
 #' @importFrom lazyeval lazy_dots
-
-
-#' Hierarchical Summary
 #'
-#' Summarise a data frame at cascading levels of granularity
+#' @title Hierarchical Summary
+#' @description Summarise a data frame at cascading levels of granularity
 #'
 #' @param collapse
 #'  A character vector of variables to group the data frame by,
@@ -60,21 +58,44 @@ heirarchicalSummary <- function(collapse, hold,
 }
 
 
+
+#' @title Performance Bins
+#' @description Summarise a variables by groups and bin the observations
+#'
+#' @param data
+#'  data frame to work with
+#' @param bin_by
+#'  Character vector defining the variables to group the data by
+#' @param cutpoints
+#'  numeric vector of value to bin the measured variable at. Values not within the range
+#'  of this vector will be grouped into the NA category. By default, data is binned
+#'  into quartiles.
+#' @param ...
+#'  Name-value pairs of summary functions like mean(), sd() etc.
+#' @return
+#'  An ungrouped table df summmarising the observed count and frequency in each bin
 #' @export
+#'
+#' @examples
+#' filter(LB4L_allSs, list==1) %>%
+#' performanceBins(bin_by = "subject",
+#'                 cutpoints=c(0,.25, .75,1),
+#'                 acc=mean(final_score))
+#'
 performanceBins <- function(data, bin_by,
-                            cutpoints = c(.25,.5,.75), ...) {
+                            cutpoints = c(0,.25,.5,.75,1), ...) {
 
   fcns <- lazyeval::lazy_dots(...)
-#   final_fns <- funs(n)
-#   final_names = paste("n",names(fcns),sep='.')
-#   names(final_fns) <- final_names
   binned <- data %>%
     group_by_(.dots = bin_by) %>%
     summarise_(.dots=fcns) %>%
     mutate_each_(funs(cut(., breaks = cutpoints, include.lowest=TRUE)),
                  vars = names(fcns)) %>%
     group_by_(.dots=names(fcns)) %>%
-    summarise(count=n(),percentage = count/nrow(data))
+    summarise(count=n()) %>%
+    ungroup() %>%
+    mutate(percentage = count/sum(count))
+  return(binned)
 
 }
 #
