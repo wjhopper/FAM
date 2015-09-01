@@ -97,7 +97,7 @@ rawData <- rawData %>%
          } else {
            as.numeric(duplicated(resp,incomparables = NA))
          },
-         intrusions  = as.numeric(score==0 & repeats ==0)) %>%
+         intrusions  = as.numeric(score==0 & repeats ==0 & response != '')) %>%
   group_by(subject,phase,practice) %>%
   mutate(cond_list =  rep(1:length(unique(list)),as.vector(table(list))))
 
