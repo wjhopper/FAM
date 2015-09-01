@@ -38,8 +38,21 @@ Start by removing any subjects with less than 5% accuracy across all conditions.
 
 ## Tailoring Phase
 ```{r tailoring}
-  tp <- tailoringPhase(LB4L_allSs)
-  print(tp$figure)
+  tailoring <- LB4L_allSs %>% filter(list==1) %>% 
+    performanceBins("subject",cutpoints = c(0,.25,.75,1),
+                    acc=mean(final_score))
+  ggplot(tailoring, aes(x=acc,y=percentage)) +
+    geom_bar(stat='identity')  + 
+    geom_text(aes(label =c("6 Secs","5 secs","4 Secs"),
+                  y= percentage+.025)) +
+    scale_y_continuous("Proportion of Subjects", limits = c(0,max(tailoring$percentage)+.025)) +
+    scale_x_discrete("Practice List Performance",
+                     labels=c("[0,0.25]" = "< 25%",
+                              "(0.25,0.75]" = "25-75%",
+                              "(0.75,1]" = "75% <")) +
+    theme_larger() +
+    ggtitle('Tailoring List')
+  
 ```
 
 
