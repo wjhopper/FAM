@@ -89,8 +89,7 @@ CFRcleaned <- filter(rawData,any(score == 2)) %>%
 #   of "cannon" in the same list", set it to 0
 # Note: I know "staek" in the rawData data frme (row 1358) is a correct
 #   answer, dunno how it got missed in fuzzy matching
-rawData$score[rawData$resp=='staek']<-1
-
+rawData$score[rawData$resp %in% 'staek']<-1
 # Replace the fuzzy matches with the manual decisions
 rawData$score[rawData$score %in% 2] <- CFRcleaned$score
 rawData$final_order <- NULL # useless column, redundant with order column

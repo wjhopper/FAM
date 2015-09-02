@@ -66,7 +66,7 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
                               RT[x, order[x,][is.na(RT[x,order[x,]])]])))
   acc <-melt(!is.na(RT), varnames=c("class","order"),value.name = "acc")
   RT <- melt(RT, varnames=c("class","order"),value.name = "RT")
-  preds <- left_join(acc,RT) %>%
+  preds <- left_join(acc,RT, by = c("class", "order")) %>%
     mutate(class =  rep(rep(c("np","sp","tp"),
                             each = nrow(prac$Acc)),
                         ncol(prac$Acc))) %>%
