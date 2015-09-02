@@ -52,11 +52,6 @@ accData <-CFR_tested  %>% group_by(subject,class,phase,practice,cond_list) %>%
        value.name="count")
 ymax <- max(CFR_tested$testOrder)
 
-timeData <- CFR_tested %>% filter(score %in% 1) %>%
-  group_by(subject,phase,list) %>% 
-  mutate(RT = FP-lag(LP),
-         RT= replace(RT,is.na(RT),FP[is.na(RT)]-onset[is.na(RT)]),
-         CRT=cumsum(RT))
 
 for (i in unique(CFR_tested$subject)){
   subAcc <- ggplot(data = filter(accData,subject ==i),
@@ -73,7 +68,7 @@ for (i in unique(CFR_tested$subject)){
     xlab("List")
   
 
-  subTime <- ggplot(data = filter(timeData,subject==i),
+  subTime <- ggplot(data = filter(CFR_tested,subject==i,score %in% 1),
                     aes(x = factor(cond_list),y=RT)) +
     geom_violin() +
     geom_point() +
