@@ -87,6 +87,8 @@ for (i in unique(CFR_tested$subject)){
 Output order is computed only for correct responses, but any RT's are measured relative 
 to the item output immediately prior, even if that item is an intrusion or repeat.
 
+Error bars represent empirical 95% confidence interval
+
 ```{r revOrder}
 reversed <- CFR_tested %>% 
   filter(score %in% 1) %>% 
@@ -94,19 +96,23 @@ reversed <- CFR_tested %>%
   arrange(desc(FP)) %>%
   group_by(subject,phase,list) %>%
   mutate(revOrder = rev(testOrder))
-meanRT <- reversed %>%
+mRT <- reversed %>%
   group_by(revOrder) %>%
   summarise(meanRT = mean(RT),
-            count = n())
-ggplot(data = reversed, 
-       aes(x= revOrder,y=RT)) +
-  geom_point(position = position_jitter(width = .2)) + 
-  geom_point(aes(y=meanRT), data=meanRT,
-             color="red") +
-  geom_line(aes(y=meanRT), data=meanRT,
-             color="red") + 
-  geom_text(aes(label = count, y=-5),data=meanRT) +
-  scale_x_discrete("Item Outout",
+            count = n(),
+            upper = quantile(RT, .975),
+            lower = quantile(RT, .025))
+ggplot(data = mRT, 
+       aes(x= factor(revOrder),y=meanRT)) +
+  geom_point(aes(y=RT), data = reversed, 
+             position = position_jitter(width = .2),
+             color="black") + 
+  geom_errorbar(mapping = aes(ymax=upper,ymin=lower),
+                width=.25,color="red",size=.75) +
+  geom_point(color="red") +
+  geom_line(aes(x=1:15),color="red") + 
+  geom_text(aes(label = count, y=-2.5)) +
+  scale_x_discrete("Item Output",
                    labels = c("n", paste("n-",1:14,sep='')))
 
 ```
