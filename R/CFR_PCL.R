@@ -1,19 +1,21 @@
 #' CFR_PCL
 #'
 #' @param free
+#'  A Named vector of numeric values.
 #' @param fixed
-#' @param yoke
-#' @param data
-#' @param fittingRT
-#' @param fittingAcc
+#'  A Named vector of numeric values.
+#' @param returnDist
+#'  Logical, controls whether a density estimate of the simulated RT distribution
+#'  is returned along with accuracy esitmates
 #'
 #' @importFrom KernSmooth bkde
 #' @import reshape2
 #' @import dplyr
+#' @import PCL
 #' @export
 #'
-CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
-                            lambda=.8, alpha = 13),
+CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
+                            lambda=.8, alpha = .02),
                     fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
                     return_dist=TRUE) {
 
@@ -26,6 +28,7 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=2, Tmax=10,
   mxn <-  p['nSim']*p['nList'] #dimensions precalculation
 
   if (!is.na(p['alpha'])) {
+    p['alpha'] <- 1/p['alpha']
     p['beta'] <- (p['alpha']/p['ER']) - p['alpha']
 
     # get the list-wise encoding rates from beta hyper distribution
