@@ -64,17 +64,23 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
 
   RT <-rbind(prac$RT,restudy$RT,tested$RT)
   order <- rbind(prac$order,restudy$order,tested$order)
+  rec <- rbind(prac$recoverable,restudy$recoverable,tested$recoverable)
   RT <-t(sapply(seq(nrow(RT)),
                 function(x) c(RT[x, order[x,][!is.na(RT[x,order[x,]])]],
                               RT[x, order[x,][is.na(RT[x,order[x,]])]])))
+  rec <-t(sapply(seq(nrow(rec)), function(x) rec[x, order[x,]]))
   acc <-melt(!is.na(RT), varnames=c("class","order"),value.name = "acc")
   RT <- melt(RT, varnames=c("class","order"),value.name = "RT")
-  preds <- left_join(acc,RT, by = c("class", "order")) %>%
+  rec <- melt(rec, varnames=c("class","order"),value.name = "rec")
+  preds <- Reduce(function(x,y) left_join(x,y, by = c("class", "order")),
+                  x=list(acc,RT,rec)) %>%
     mutate(class =  rep(rep(c("np","sp","tp"),
                             each = nrow(prac$Acc)),
                         ncol(prac$Acc))) %>%
     group_by(class,order) %>%
-    summarise(acc = mean(acc),
+    summarise(unrec = mean(!rec & !acc),
+              timeout = mean(!acc & rec),
+              acc = mean(acc),
               RT = median(RT,na.rm = TRUE))
   if (!anyNA(p[c("Tmin","Tmax","theta","Time")]) && return_dist)   {
     dist <- data.frame(class = rep(c('np','sp','tp'),each=13500), # 13500 = 15 items * 900 points
@@ -102,7 +108,6 @@ RTdis <- function(RT = NULL, order = NULL, Time= NULL) {
   for (n in 1:ncol(RT)) {
     RTs<- RT[!is.na(RT[,n]),n]
     if (length(RTs)>2) {
-#       D <- bkde(RTs,bandwidth=1,gridsize=900,range.x=c(.1,90))
       D <- density(RTs,bw=1,n=900,from=.1,to=90)
       D$y[D$y <= 0] <-  (0.5)*.Machine$double.xmin
       height <- D$y/sum(D$y)
@@ -116,7 +121,6 @@ RTdis <- function(RT = NULL, order = NULL, Time= NULL) {
 
 LL <- function(obs,pred) {
   likelihoods <- inner_join(obs,pred)
-  #   likelihoods$RTdist[likelihoods$RTdist == 0] <- (0.5)*.Machine$double.xmin
   err <- -sum(log(likelihoods$RTdist))
   return(err)
 }
