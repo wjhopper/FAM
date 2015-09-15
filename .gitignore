@@ -3,3 +3,4 @@
 .RData
 inst/doc
 .build.timestamp
+/*.R*
