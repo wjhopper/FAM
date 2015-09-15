@@ -17,7 +17,7 @@
 CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
                             lambda=.8, alpha = .02),
                     fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
-                    return_dist=TRUE) {
+                    return_dist=TRUE, summarised = TRUE) {
 
   p <- c(free,fixed)
   if (!paramBounds(p)) {
@@ -76,12 +76,16 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
                   x=list(acc,RT,rec)) %>%
     mutate(class =  rep(rep(c("np","sp","tp"),
                             each = nrow(prac$Acc)),
-                        ncol(prac$Acc))) %>%
-    group_by(class,order) %>%
-    summarise(unrec = mean(!rec & !acc),
-              timeout = mean(!acc & rec),
-              acc = mean(acc),
-              RT = median(RT,na.rm = TRUE))
+                        ncol(prac$Acc)),
+           unrec = !rec & !acc,
+           timeout = !acc & rec) %>%
+    group_by(class,order)
+  if (summarised) {
+    preds <- preds %>%
+      summarise(unrec = mean(unrec),
+                timeout = mean(timeout),
+                RT = median(RT[acc]),
+                acc = mean(acc))
   if (!anyNA(p[c("Tmin","Tmax","theta","Time")]) && return_dist)   {
     dist <- data.frame(class = rep(c('np','sp','tp'),each=13500), # 13500 = 15 items * 900 points
                        rbind(RTdis(prac$RT, prac$order, p['Time']),
