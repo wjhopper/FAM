@@ -118,21 +118,3 @@ RTdis <- function(RT = NULL, order = NULL, Time= NULL) {
   RTdist$RTrounded <- RTdist$RTrounded/10
   return(RTdist)
 }
-
-LL <- function(obs,pred) {
-  likelihoods <- inner_join(obs,pred)
-  err <- -sum(log(likelihoods$RTdist))
-  return(err)
-}
-
-
-SSE <- function(obs,pred) {
-  obs <- obs %>% group_by(class,order) %>%
-    summarise(acc = sum(score)/4)
-  data <- pred %>% group_by(class,order) %>%
-    summarise(pred_acc = mean(pred_acc)) %>%
-    left_join(obs)
-  data$acc[is.na(data$acc)] <- 0 # set na's for accuracy for zeros
-  err <- sum((data$pred_acc-data$acc)^2)
-  return(err)
-}
