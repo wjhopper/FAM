@@ -62,35 +62,47 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
                      Tmin = p['Tmin'], Tmax = p['Tmax'],
                      Time = p['Time'], lambda=p['lambda'])
 
-  RT <-rbind(prac$RT,restudy$RT,tested$RT)
+  # Putting the output together
   order <- rbind(prac$order,restudy$order,tested$order)
+  RT <-rbind(prac$RT,restudy$RT,tested$RT)
   rec <- rbind(prac$recoverable,restudy$recoverable,tested$recoverable)
-  RT <-t(sapply(seq(nrow(RT)),
-                function(x) c(RT[x, order[x,][!is.na(RT[x,order[x,]])]],
-                              RT[x, order[x,][is.na(RT[x,order[x,]])]])))
+  acc <- rbind(prac$Acc,restudy$Acc,tested$Acc)
+
+  # Sorting the output
+  RT <- t(sapply(seq(nrow(RT)),function(x) RT[x,order[x,]]))
   rec <-t(sapply(seq(nrow(rec)), function(x) rec[x, order[x,]]))
-  acc <-melt(!is.na(RT), varnames=c("class","order"),value.name = "acc")
+  acc <-t(sapply(seq(nrow(acc)), function(x) acc[x, order[x,]]))
+
+  # Reshaping the output
+  acc <-melt(acc, varnames=c("class","order"),value.name = "acc")
   RT <- melt(RT, varnames=c("class","order"),value.name = "RT")
   rec <- melt(rec, varnames=c("class","order"),value.name = "rec")
+
   preds <- Reduce(function(x,y) left_join(x,y, by = c("class", "order")),
                   x=list(acc,RT,rec)) %>%
-    mutate(class =  rep(rep(c("np","sp","tp"),
-                            each = nrow(prac$Acc)),
+    mutate(class =  rep(rep(c("np","sp","tp"), each = nrow(prac$Acc)),
                         ncol(prac$Acc)),
            unrec = !rec & !acc,
            timeout = !acc & rec) %>%
+    select(-rec) %>%
     group_by(class,order)
+
+  # Check summarise switch
   if (summarised) {
     preds <- preds %>%
       summarise(unrec = mean(unrec),
                 timeout = mean(timeout),
                 RT = median(RT[acc]),
                 acc = mean(acc))
+  }
+
+  # Check if we want a density estimate of RTs
+  # For correct items only
   if (!anyNA(p[c("Tmin","Tmax","theta","Time")]) && return_dist)   {
-    dist <- data.frame(class = rep(c('np','sp','tp'),each=13500), # 13500 = 15 items * 900 points
-                       rbind(RTdis(prac$RT, prac$order, p['Time']),
-                             RTdis(restudy$RT, restudy$order, p['Time']),
-                             RTdis(tested$RT, tested$order, p['Time']),
+    dist <- data.frame(class = rep(c('np','sp','tp'), each=ncol(RT)*p['Time']*10), # 13500 = 15 items * 900 points
+                       rbind(RTdis(prac$RT, prac$Acc, prac$order),
+                             RTdis(restudy$RT,restudy$Acc, restudy$order),
+                             RTdis(tested$RT, tested$Acc, tested$order),
                        row.names = NULL))
     return(list(preds = preds,distribution = dist))
   } else {
@@ -99,26 +111,27 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
 }
 
 
-RTdis <- function(RT = NULL, order = NULL, Time= NULL) {
+RTdis <- function(RT, acc, order, Time=90) {
 
   # for each rank ordering recall position (Nlist),
   # the KS density at each 1/10 second of recall test period (TestTime)
 
   RTdist=matrix(0,nrow=10*Time,ncol=ncol(RT))
-  RT <-t(sapply(seq(nrow(RT)),
-                function(x) c(RT[x, order[x,][!is.na(RT[x,order[x,]])]],
-                              RT[x, order[x,][is.na(RT[x,order[x,]])]])
-  ))
+  RT <-t(sapply(seq(nrow(RT)), function(x) RT[x,order[x,]]))
+  acc <- t(sapply(seq(nrow(acc)), function(x) acc[x,order[x,]]))
+
   for (n in 1:ncol(RT)) {
-    RTs<- RT[!is.na(RT[,n]),n]
+    RTs<- RT[acc[,n],n]
     if (length(RTs)>2) {
-      D <- density(RTs,bw=1,n=900,from=.1,to=90)
-      D$y[D$y <= 0] <-  (0.5)*.Machine$double.xmin
+      D <- density(RTs,bw=1,n=900,from=.1,to=Time)
+      D$y[D$y <= 0] <-  .Machine$double.xmin
       height <- D$y/sum(D$y)
       RTdist[,n] <- (length(RTs)/nrow(RT))*height
     }
   }
-  RTdist <- melt(RTdist/sum(RTdist),varnames=c("RTrounded","order"),value.name = "RTdist")
+  RTdist <- melt(RTdist/sum(RTdist),
+                 varnames=c("RTrounded","order"),
+                 value.name = "RTdist")
   RTdist$RTrounded <- RTdist$RTrounded/10
   return(RTdist)
 }
