@@ -127,11 +127,20 @@ RTdist <- function(RT, time=90) {
     summarise(acc=mean(acc))
   dist <- RT %>%
     do(d = density(.$RT[.$acc], bw=1,n=time*10,from=.1,to=time)) %>%
-    do(data.frame(class = .$class, order = .$order, RT = .$d$x,y=.$d$y)) %>%
+    do(data_frame(class = .$class, order = .$order, RT = .$d$x,y=.$d$y)) %>%
     mutate(y = replace(y,y<=0, .Machine$double.xmin)) %>%
     group_by_(.dots = as.character(groups(RT))) %>%
     mutate(y = (y/sum(y))*acc$acc[acc$class==class[1] & acc$order==order[1]]) %>%
     group_by(class) %>%
     mutate(y =y/sum(y))
   return(dist)
+}
+
+#' @export
+summarise_CFR_PCL <- function(preds) {
+    summarise(preds,
+              unrec = mean(unrec),
+              timeout = mean(timeout),
+              RT = median(RT[acc]),
+              acc = mean(acc))
 }
