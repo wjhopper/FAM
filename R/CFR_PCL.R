@@ -1,4 +1,5 @@
 #' CFR_PCL
+#' An implementation of the PCL model to the FAM_CFR data set
 #'
 #' @param free
 #'  A Named vector of numeric values.
@@ -17,7 +18,7 @@
 CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
                             lambda=.8, alpha = .02),
                     fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
-                    return_dist=TRUE, summarised = TRUE) {
+                    summarised = TRUE) {
 
   p <- c(free,fixed)
   if (!paramBounds(p)) {
@@ -96,42 +97,41 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
                 acc = mean(acc))
   }
 
+  return(preds)
   # Check if we want a density estimate of RTs
   # For correct items only
-  if (!anyNA(p[c("Tmin","Tmax","theta","Time")]) && return_dist)   {
-    dist <- data.frame(class = rep(c('np','sp','tp'), each=ncol(RT)*p['Time']*10), # 13500 = 15 items * 900 points
-                       rbind(RTdis(prac$RT, prac$Acc, prac$order),
-                             RTdis(restudy$RT,restudy$Acc, restudy$order),
-                             RTdis(tested$RT, tested$Acc, tested$order),
-                       row.names = NULL))
-    return(list(preds = preds,distribution = dist))
-  } else {
-    return(preds = preds)
-  }
 }
 
 
-RTdis <- function(RT, acc, order, Time=90) {
+#' RTdist: Normalized Density Estimates
+#'
+#' Estimated Gaussian kernel density at each 1/10 second of recall test period,
+#' using a bandwidth of 1. Density results are normalized so that the sum
+#' of the densities at each output positions is 1.
+#'
+#' @param RT
+#' @param time Totall test duration measured in seconds. Density is estimated
+#'  at every tenth of a second between .1 and \code{time}
+#'
+#' @return A data frame
+#' @export
+#' @examples
+#'  preds <- CFR_PCL(summarised=FALSE)
+#'  dist <- preds %>% group_by(class,order) %>% RTdist()
 
-  # for each rank ordering recall position (Nlist),
-  # the KS density at each 1/10 second of recall test period (TestTime)
-
-  RTdist=matrix(0,nrow=10*Time,ncol=ncol(RT))
-  RT <-t(sapply(seq(nrow(RT)), function(x) RT[x,order[x,]]))
-  acc <- t(sapply(seq(nrow(acc)), function(x) acc[x,order[x,]]))
-
-  for (n in 1:ncol(RT)) {
-    RTs<- RT[acc[,n],n]
-    if (length(RTs)>2) {
-      D <- density(RTs,bw=1,n=900,from=.1,to=Time)
-      D$y[D$y <= 0] <-  .Machine$double.xmin
-      height <- D$y/sum(D$y)
-      RTdist[,n] <- (length(RTs)/nrow(RT))*height
-    }
+RTdist <- function(RT, time=90) {
+  if (all(group_size(RT) == 1)) {
+    stop("Cannot estimate densities using summarised model predictions")
   }
-  RTdist <- melt(RTdist/sum(RTdist),
-                 varnames=c("RTrounded","order"),
-                 value.name = "RTdist")
-  RTdist$RTrounded <- RTdist$RTrounded/10
-  return(RTdist)
+  acc  <- RT %>%
+    summarise(acc=mean(acc))
+  dist <- RT %>%
+    do(d = density(.$RT[.$acc], bw=1,n=time*10,from=.1,to=time)) %>%
+    do(data.frame(class = .$class, order = .$order, RT = .$d$x,y=.$d$y)) %>%
+    mutate(y = replace(y,y<=0, .Machine$double.xmin)) %>%
+    group_by_(.dots = as.character(groups(RT))) %>%
+    mutate(y = (y/sum(y))*acc$acc[acc$class==class[1] & acc$order==order[1]]) %>%
+    group_by(class) %>%
+    mutate(y =y/sum(y))
+  return(dist)
 }

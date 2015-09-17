@@ -2,26 +2,23 @@
 % Please edit documentation in R/CFR_PCL.R
 \name{CFR_PCL}
 \alias{CFR_PCL}
-\title{CFR_PCL}
+\title{CFR_PCL
+An implementation of the PCL model to the FAM_CFR data set}
 \usage{
-CFR_PCL(free = c(ER = 0.53, LR = 0.3, TR = 0.3, FR = 0.1, Tmin = 2, Tmax = 10,
-  lambda = 0.8, alpha = 13), fixed = c(theta = 0.5, nFeat = 100, nSim = 1000,
-  nList = 15, Time = 90), return_dist = TRUE)
+CFR_PCL(free = c(ER = 0.53, LR = 0.3, TR = 0.3, FR = 0.1, Tmin = 1, Tmax = 30,
+  lambda = 0.8, alpha = 0.02), fixed = c(theta = 0.5, nFeat = 100, nSim =
+  1000, nList = 15, Time = 90), summarised = TRUE)
 }
 \arguments{
-\item{free}{}
+\item{free}{A Named vector of numeric values.}
 
-\item{fixed}{}
+\item{fixed}{A Named vector of numeric values.}
 
-\item{yoke}{}
-
-\item{data}{}
-
-\item{fittingRT}{}
-
-\item{fittingAcc}{}
+\item{returnDist}{Logical, controls whether a density estimate of the simulated RT distribution
+ is returned along with accuracy esitmates}
 }
 \description{
 CFR_PCL
+An implementation of the PCL model to the FAM_CFR data set
 }
 
