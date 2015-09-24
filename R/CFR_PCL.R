@@ -66,21 +66,24 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
   # Putting the output together
   order <- rbind(prac$order,restudy$order,tested$order)
   RT <-rbind(prac$RT,restudy$RT,tested$RT)
+  RTcor <- rbind(prac$RTcor,restudy$RTcor,tested$RTcor)
   rec <- rbind(prac$recoverable,restudy$recoverable,tested$recoverable)
   acc <- rbind(prac$Acc,restudy$Acc,tested$Acc)
 
   # Sorting the output
   RT <- t(sapply(seq(nrow(RT)),function(x) RT[x,order[x,]]))
+  RTcor <- t(sapply(seq(nrow(RTcor)),function(x) RTcor[x,order[x,]]))
   rec <-t(sapply(seq(nrow(rec)), function(x) rec[x, order[x,]]))
   acc <-t(sapply(seq(nrow(acc)), function(x) acc[x, order[x,]]))
 
   # Reshaping the output
   acc <-melt(acc, varnames=c("class","order"),value.name = "acc")
   RT <- melt(RT, varnames=c("class","order"),value.name = "RT")
+  RTcor <- melt(RTcor, varnames=c("class","order"),value.name = "RTcor")
   rec <- melt(rec, varnames=c("class","order"),value.name = "rec")
 
   preds <- Reduce(function(x,y) left_join(x,y, by = c("class", "order")),
-                  x=list(acc,RT,rec)) %>%
+                  x=list(acc,RT,RTcor,rec)) %>%
     mutate(class =  rep(rep(c("np","sp","tp"), each = nrow(prac$Acc)),
                         ncol(prac$Acc)),
            unrec = !rec & !acc,
@@ -126,7 +129,7 @@ RTdist <- function(RT, time=90) {
   acc  <- RT %>%
     summarise(acc=mean(acc))
   dist <- RT %>%
-    do(d = density(.$RT[.$acc], bw=1,n=time*10,from=.1,to=time)) %>%
+    do(d = density(.$RTcor[.$acc], bw=1,n=time*10,from=.1,to=time)) %>%
     do(data_frame(class = .$class, order = .$order, RT = .$d$x,y=.$d$y)) %>%
     mutate(y = replace(y,y<=0, .Machine$double.xmin)) %>%
     group_by_(.dots = as.character(groups(RT))) %>%
