@@ -1,13 +1,13 @@
 Package: FAM
 Title: Forgetting and Memory, an Investigation of the Testing Effect
-Version: 0.0.01.9002
+Version: 0.0.01.9003
 Authors@R: person("Will", "Hopper", email = "whopper@psych.umass.edu", role = c("aut", "cre"))
 Description: Contains the analysis of 3 experimental datasets. List Before the Last (LB4L), Switch Cue Keep Target (SCKT) and 
 	Cumulative Free Recall (CFR). 
 URL: https://github.com/wjhopper/FAM
 BugReports: https://github.com/wjhopper/FAM/issues
 Depends: R (>= 3.0.0)
-Imports: dplyr, ggplot2, reshape2, tidyr, whoppeR (>= 0.0.0.9001), PCL (>= 0.0.0.9003)
+Imports: dplyr, ggplot2, reshape2, tidyr, whoppeR (>= 0.0.0.9004), PCL (>= 0.0.0.9003)
 Suggests: knitr, grid, gridExtra, pander, wesandersen, testthat
 License: CC0
 LazyData: true

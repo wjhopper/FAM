@@ -15,7 +15,7 @@
 #' @import PCL
 #' @export
 #'
-CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =20,TR = .1, FR=.1,Tmin=1,Tmax=30,lambda=.8),
+CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1, FR=.1,Tmin=1,Tmax=30,lambda=.8),
                     fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
                     summarised = TRUE) {
 
