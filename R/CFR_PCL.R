@@ -15,8 +15,7 @@
 #' @import PCL
 #' @export
 #'
-CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
-                            lambda=.8, alpha = .02),
+CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =20,TR = .1, FR=.1,Tmin=1,Tmax=30,lambda=.8),
                     fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
                     summarised = TRUE) {
 
@@ -28,35 +27,35 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
   set.seed(456)
   mxn <-  p['nSim']*p['nList'] #dimensions precalculation
 
-  if (!is.na(p['alpha'])) {
-    p['alpha'] <- 1/p['alpha']
-    p['beta'] <- (p['alpha']/p['ER']) - p['alpha']
+  # we want to sample from a beta distribution with the same
+  # mean and sd as binomial(N = nFeat,p=ER) distribution.
+  # The problem is that the binomial is [0,nFeat], and the equations we
+  # to solve for beta distributions alpha and beta from mean and sd
+  # are for beta bounded between zero and 1 aka the 2 parameter beta.
+  # So we need to divide the mean and varianace of the binomial by nFeat
+  # and nFeat^2. Then we can use our equations, and multiply by nFeat after sampling
 
-    # get the list-wise encoding rates from beta hyper distribution
-    ERates <- matrix(rbeta(n = p['nSim'],p['alpha'],p['beta']),
-                     nrow=p['nSim'],ncol=p['nList'])
-  } else {
-    ERates <- p['ER']
-    # initial learning
-  }
+  binomVAR <- p['nFeat']*p['ER']*(1-p['ER'])
+  binomM <- p['nFeat']*p['ER']
+  beta_pars = betaABfromMeanSD(mean = binomM/p['nFeat'],
+                               sd = sqrt(binomVAR/p['nFeat']^2))
+  mem <- matrix(rbeta(mxn, beta_pars$a, beta_pars$b),
+                nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
+  thresh <- matrix(rbeta(mxn, p['Ta'],  p['Ta']),
+                   nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
 
-  mem <- matrix(rbinom(mxn,p['nFeat'], ERates),
-                nrow=p['nSim'],ncol=p['nList'])
-  thresh <- matrix(rbinom(mxn,p['nFeat'], p['theta']),
-                   nrow=p['nSim'],ncol=p['nList'])
-
-  #practice test
+  # practice test
   prac <- freeRecall(mem,thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
                      Time = p['Time'], lambda=p['lambda'])
 
   # study practice
-  restudyStrengths <- study(mem, nFeatures=p['nFeat'],
+  restudyStrengths <- study_beta(mem=mem, nFeatures=p['nFeat'],
                             LR = p['LR'], FR = p['FR'])
   restudy<-freeRecall(restudyStrengths, thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
                       Time = p['Time'], lambda=p['lambda'])
 
   # test practice
-  testStrengths <- test(mem,  nFeatures=p['nFeat'],
+  testStrengths <- test_beta(mem=mem,  nFeatures=p['nFeat'],
                         thresh = thresh, acc = prac$Acc, LR = p['LR'],
                         TR = p['TR'], FR = p['FR'])
   tested <- freeRecall(testStrengths$mem, testStrengths$thresh,
@@ -93,13 +92,8 @@ CFR_PCL <- function(free= c(ER=.53,LR=.3,TR =.3, FR=.1,Tmin=1, Tmax=30,
 
   # Check summarise switch
   if (summarised) {
-    preds <- preds %>%
-      summarise(unrec = mean(unrec),
-                timeout = mean(timeout),
-                RT = median(RT[acc]),
-                acc = mean(acc))
+    preds <- summarise_CFR_PCL(preds)
   }
-
   return(preds)
   # Check if we want a density estimate of RTs
   # For correct items only
@@ -144,6 +138,7 @@ summarise_CFR_PCL <- function(preds) {
     summarise(preds,
               unrec = mean(unrec),
               timeout = mean(timeout),
-              RT = median(RT[acc]),
+              RT = median(RT),
+              RTcor = median(RTcor[acc]),
               acc = mean(acc))
 }
