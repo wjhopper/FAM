@@ -15,8 +15,8 @@
 #' @import PCL
 #' @export
 #'
-CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1, FR=.1,Tmin=1,Tmax=30,lambda=.8),
-                    fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
+CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda=.8),
+                    fixed = c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
                     summarised = TRUE) {
 
   p <- c(free,fixed)
@@ -70,7 +70,7 @@ CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1, FR=.1,Tmin=1,Tmax=30
   acc <- rbind(prac$Acc,restudy$Acc,tested$Acc)
 
   # Sorting the output
-  for (x in 1:p['nSim']) {
+  for (x in 1:(p['nSim']*3)) {
     RT[x,] <- RT[x,order[x,]]
     RTcor[x,] <- RTcor[x,order[x,]]
     rec[x,] <- rec[x,order[x,]]
