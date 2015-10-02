@@ -1,4 +1,3 @@
-library(FAM)
 context("Checking Likelihood Function Sanity")
 
 preds <- CFR_PCL(summarised=FALSE)

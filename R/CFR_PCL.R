@@ -98,7 +98,7 @@ CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1, FR=.1,Tmin=1,Tmax=30
   # Check summarise switch
   if (summarised) {
     preds <- preds %>%
-      # group_by(class, obsOrder) %>%
+      ungroup() %>%
       summarise_CFR_PCL()
   }
   return(preds)
@@ -145,7 +145,7 @@ RTdist <- function(RT, time=90) {
 #' @export
 summarise_CFR_PCL <- function(preds) {
   mem_summary <- preds %>%
-    group_by(class,memOrder) %>%
+    group_by(class,memOrder, add = TRUE) %>%
     summarise(unrec = mean(unrec),
               timeout = mean(timeout),
               RT = median(memRT),
@@ -153,8 +153,10 @@ summarise_CFR_PCL <- function(preds) {
     rename(order = memOrder)
   obs_summary <- preds %>%
     filter(!is.na(obsOrder)) %>%
-    group_by(class,obsOrder) %>%
+    group_by(class,obsOrder, add = TRUE) %>%
     summarise(RTcor = median(obsRT)) %>%
     rename(order = obsOrder)
-  return(left_join(mem_summary,obs_summary, by = c("class","order")))
+  mem_summary <- group_by(mem_summary, class, order, add =T)
+  grps <- as.character(groups(mem_summary))
+  return(left_join(mem_summary,obs_summary, by = grps))
 }
