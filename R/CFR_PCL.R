@@ -127,18 +127,19 @@ RTdist <- function(RT, time=90) {
   }
   acc  <- RT %>% group_by(class,memOrder) %>%
     summarise(acc=mean(acc))
-  safe_density <- failwith(list(x=seq(.1,time,.1), y = 0),
-                           density)
+  safe_density <- failwith(default = list(x = seq(0.1, time, 0.1), y = 0),
+                           f=density, quiet = TRUE)
   dist <- RT %>%
     filter(!is.na(obsOrder)) %>%
-    do(d = safe_density(.$obsRT, bw=1,n=time*10,from=.1,to=time)) %>%
+    do(d = safe_density(.$obsRT, bw=1,n=time*10,from=.1,to=time,na.rm=TRUE)) %>%
     do(data_frame(class = .$class, obsOrder = .$obsOrder, RT = .$d$x,y=.$d$y)) %>%
-#     mutate(y = replace(y,y<=0, .Machine$double.xmin)) %>%
     group_by_(.dots = as.character(groups(RT))) %>%
     mutate(y = (y/sum(y))*acc$acc[acc$class==class[1] & acc$memOrder==obsOrder[1]]) %>%
     group_by(class) %>%
     mutate(y =y/sum(y)) %>%
-    rename(order=obsOrder)
+    rename(order=obsOrder) %>%
+    ungroup()
+
   return(dist)
 }
 
