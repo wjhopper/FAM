@@ -119,7 +119,7 @@ CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1, FR=.1,Tmin=1,Tmax=30
 #' @export
 #' @examples
 #'  preds <- CFR_PCL(summarised=FALSE)
-#'  dist <- preds %>% group_by(class,order) %>% RTdist()
+#'  dist <- preds %>% group_by(class,obsOrder) %>% RTdist()
 
 RTdist <- function(RT, time=90) {
   if (all(group_size(RT) == 1)) {
