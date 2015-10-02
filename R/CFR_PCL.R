@@ -70,33 +70,38 @@ CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1, FR=.1,Tmin=1,Tmax=30
   acc <- rbind(prac$Acc,restudy$Acc,tested$Acc)
 
   # Sorting the output
-  RT <- t(sapply(seq(nrow(RT)),function(x) RT[x,order[x,]]))
-  RTcor <- t(sapply(seq(nrow(RTcor)),function(x) RTcor[x,order[x,]]))
-  rec <-t(sapply(seq(nrow(rec)), function(x) rec[x, order[x,]]))
-  acc <-t(sapply(seq(nrow(acc)), function(x) acc[x, order[x,]]))
+  for (x in 1:p['nSim']) {
+    RT[x,] <- RT[x,order[x,]]
+    RTcor[x,] <- RTcor[x,order[x,]]
+    rec[x,] <- rec[x,order[x,]]
+    acc[x,] <- acc[x,order[x,]]
+  }
 
   # Reshaping the output
-  acc <-melt(acc, varnames=c("class","order"),value.name = "acc")
-  RT <- melt(RT, varnames=c("class","order"),value.name = "RT")
-  RTcor <- melt(RTcor, varnames=c("class","order"),value.name = "RTcor")
-  rec <- melt(rec, varnames=c("class","order"),value.name = "rec")
+  acc <-melt(acc, varnames=c("class","memOrder"),value.name = "acc")
+  RT <- melt(RT, varnames=c("class","memOrder"),value.name = "memRT")
+  RTcor <- melt(RTcor, varnames=c("class","memOrder"),value.name = "obsRT")
+  rec <- melt(rec, varnames=c("class","memOrder"),value.name = "rec")
 
-  preds <- Reduce(function(x,y) left_join(x,y, by = c("class", "order")),
+  preds <- Reduce(function(x,y) left_join(x,y, by = c("class", "memOrder")),
                   x=list(acc,RT,RTcor,rec)) %>%
     mutate(class =  rep(rep(c("np","sp","tp"), each = nrow(prac$Acc)),
                         ncol(prac$Acc)),
+           sim  = rep(1:p['nSim'], times = p['nList']*3),
            unrec = !rec & !acc,
            timeout = !acc & rec) %>%
-    select(-rec) %>%
-    group_by(class,order)
+    group_by(class,sim,acc) %>%
+    mutate(obsOrder = 1:n(),
+           obsOrder = replace(obsOrder, acc==FALSE, NA)) %>%
+    select(-rec)
 
   # Check summarise switch
   if (summarised) {
-    preds <- summarise_CFR_PCL(preds)
+    preds <- preds %>%
+      # group_by(class, obsOrder) %>%
+      summarise_CFR_PCL()
   }
   return(preds)
-  # Check if we want a density estimate of RTs
-  # For correct items only
 }
 
 
@@ -120,25 +125,36 @@ RTdist <- function(RT, time=90) {
   if (all(group_size(RT) == 1)) {
     stop("Cannot estimate densities using summarised model predictions")
   }
-  acc  <- RT %>%
+  acc  <- RT %>% group_by(class,memOrder) %>%
     summarise(acc=mean(acc))
+  safe_density <- failwith(list(x=seq(.1,time,.1), y = 0),
+                           density)
   dist <- RT %>%
-    do(d = density(.$RTcor[.$acc], bw=1,n=time*10,from=.1,to=time)) %>%
-    do(data_frame(class = .$class, order = .$order, RT = .$d$x,y=.$d$y)) %>%
-    mutate(y = replace(y,y<=0, .Machine$double.xmin)) %>%
+    filter(!is.na(obsOrder)) %>%
+    do(d = safe_density(.$obsRT, bw=1,n=time*10,from=.1,to=time)) %>%
+    do(data_frame(class = .$class, obsOrder = .$obsOrder, RT = .$d$x,y=.$d$y)) %>%
+#     mutate(y = replace(y,y<=0, .Machine$double.xmin)) %>%
     group_by_(.dots = as.character(groups(RT))) %>%
-    mutate(y = (y/sum(y))*acc$acc[acc$class==class[1] & acc$order==order[1]]) %>%
+    mutate(y = (y/sum(y))*acc$acc[acc$class==class[1] & acc$memOrder==obsOrder[1]]) %>%
     group_by(class) %>%
-    mutate(y =y/sum(y))
+    mutate(y =y/sum(y)) %>%
+    rename(order=obsOrder)
   return(dist)
 }
 
 #' @export
 summarise_CFR_PCL <- function(preds) {
-    summarise(preds,
-              unrec = mean(unrec),
+  mem_summary <- preds %>%
+    group_by(class,memOrder) %>%
+    summarise(unrec = mean(unrec),
               timeout = mean(timeout),
-              RT = median(RT),
-              RTcor = median(RTcor[acc]),
-              acc = mean(acc))
+              RT = median(memRT),
+              acc = mean(acc)) %>%
+    rename(order = memOrder)
+  obs_summary <- preds %>%
+    filter(!is.na(obsOrder)) %>%
+    group_by(class,obsOrder) %>%
+    summarise(RTcor = median(obsRT)) %>%
+    rename(order = obsOrder)
+  return(left_join(mem_summary,obs_summary, by = c("class","order")))
 }
