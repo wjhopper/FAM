@@ -1,5 +1,5 @@
-#' CFR_PCL
-#' An implementation of the PCL model to the FAM_CFR data set
+#' CFR_PCR
+#' An implementation of the PCR model to the FAM_CFR data set
 #'
 #' @param free
 #'  A Named vector of numeric values.
@@ -12,10 +12,10 @@
 #' @importFrom KernSmooth bkde
 #' @import reshape2
 #' @import dplyr
-#' @import PCL
+#' @import PCR
 #' @export
 #'
-CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda=.8),
+CFR_PCR <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda=.8),
                     fixed = c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
                     summarised = TRUE) {
 
@@ -99,7 +99,7 @@ CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda
   if (summarised) {
     preds <- preds %>%
       ungroup() %>%
-      summarise_CFR_PCL()
+      summarise_CFR_PCR()
   }
   return(preds)
 }
@@ -118,7 +118,7 @@ CFR_PCL <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda
 #' @return A data frame
 #' @export
 #' @examples
-#'  preds <- CFR_PCL(summarised=FALSE)
+#'  preds <- CFR_PCR(summarised=FALSE)
 #'  dist <- preds %>% group_by(class,obsOrder) %>% RTdist()
 
 RTdist <- function(RT, time=90) {
@@ -144,7 +144,7 @@ RTdist <- function(RT, time=90) {
 }
 
 #' @export
-summarise_CFR_PCL <- function(preds) {
+summarise_CFR_PCR <- function(preds) {
   mem_summary <- preds %>%
     group_by(class,memOrder, add = TRUE) %>%
     summarise(unrec = mean(unrec),

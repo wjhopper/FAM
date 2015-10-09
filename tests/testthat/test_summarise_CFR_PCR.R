@@ -1,5 +1,5 @@
 context("Checking Model Summary Sanity")
-preds <- CFR_PCL(summarised=TRUE)
+preds <- CFR_PCR(summarised=TRUE)
 
 test_that("Number of rows = conditions * items", {
   expect_equal(nrow(preds),45)

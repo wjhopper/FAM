@@ -1,6 +1,6 @@
 
 #' @export
-SCKT_PCL <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
+SCKT_PCR <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                        fixed = c(theta=.5,nFeat=100,nSim=1000,
                                  nList=4,Tmin=NA, Tmax=NA, lambda=NA,Time=NA)) {
 

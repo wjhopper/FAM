@@ -7,7 +7,7 @@ Description: Contains the analysis of 3 experimental datasets. List Before the L
 URL: https://github.com/wjhopper/FAM
 BugReports: https://github.com/wjhopper/FAM/issues
 Depends: R (>= 3.0.0)
-Imports: dplyr, ggplot2, reshape2, tidyr, whoppeR (>= 0.0.0.9004), PCL (>= 0.0.0.9005)
+Imports: dplyr, ggplot2, reshape2, tidyr, whoppeR (>= 0.0.0.9004), PCR (>= 0.1.0.9000)
 Suggests: knitr, grid, gridExtra, pander, wesandersen, testthat
 License: CC0
 LazyData: true

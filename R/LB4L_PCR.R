@@ -1,5 +1,5 @@
 #' @import optimx
-#' @import PCL
+#' @import PCR
 #' @import dplyr
 #' @import whoppeR
 NULL
@@ -16,7 +16,7 @@ NULL
 #'
 #' @examples
 #'  model <- list(par = c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
-#'                fn = PCLss, method="Nelder-Mead", itnmax = 1000,
+#'                fn = PCRss, method="Nelder-Mead", itnmax = 1000,
 #'                fix= c(theta=.5,nFeat=100,nSim=1000,nList=15),
 #'                IVdata= data, jointData = data, condData = data,
 #'                fitting = TRUE, name = 'std_ss'))
@@ -42,7 +42,7 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
   checkRequiredParams(c(model$par,model$fixed), model$fn)
 #   if (debugLevel[1]>0){
 #     trace(model$fn, browser, at=debugLevel[2])
-# #     setBreakpoint('PCL.R', debugLevel[2], envir = environment())
+# #     setBreakpoint('PCR.R', debugLevel[2], envir = environment())
 #   }
   if (inpar) {
     logfile <- tempfile("parlog", fileext = ".txt")
@@ -50,7 +50,7 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
                con=logfile,sep='\n')
     clusterExport(cl,"logfile",envir = environment())
     model$results <- foreach(j =unique(model$IVdata$subject), .verbose=T,
-                             .packages=c("optimx","PCL","whoppeR")) %dopar% {
+                             .packages=c("optimx","PCR","whoppeR")) %dopar% {
         sink(logfile, append=TRUE)
         cat(paste("Fitting subject", j,"\n"))
         sink()
@@ -91,7 +91,7 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
   }
 
   if (debugLevel[1]>0){
-    untrace(PCL)
+    untrace(PCR)
   }
 
 #   resultsFile <- paste(model$objective_fcn, model$name, 'results',sep='_')
@@ -118,12 +118,12 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
 #'  conditional, and IV condition-level predictions is returned.
 #'
 #' @examples
-#' LB4L_PCLss(free= c(ER=.53,LR=.15,TR =.1, F1=.1,space=.03),
+#' LB4L_PCRss(free= c(ER=.53,LR=.15,TR =.1, F1=.1,space=.03),
 #'            fixed = c(theta=.5,nFeat=100,nSim=1000,nList=15,
 #'                     Tmin=NA, Tmax=NA, lambda=NA,Time=NA),
 #'                     fitting=FALSE)
 #' @export
-LB4L_PCLss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
+LB4L_PCRss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                        fixed = c(theta=.5,nFeat=100,nSim=1000,
                                  nList=15,Tmin=NA, Tmax=NA, lambda=NA,Time=NA),
                        IVdata = filter(LB4L_IV(LB4L_allSs)$subject, subject == 17),
