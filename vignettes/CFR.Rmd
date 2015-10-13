@@ -29,11 +29,29 @@ knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE,
 
 ```{r testonlyData}
 CFR_tested <- filter(CFR_allSs,
-                     list != 0, (score %in% 1 | intrusions %in% 1 | repeats %in% 1),
+                     list != 0, 
+                     (score %in% 1 | intrusions %in% 1 | repeats %in% 1),
                      phase=='final' | (phase=='prac' & practice =='T')) %>%
     group_by(subject,phase,list) %>%
     mutate(testOrder = 1:n())
 
+agg <- filter(CFR_allSs,
+              list != 0, score== 1,
+              phase=='final' | (phase=='prac' & practice =='T')) %>%
+  ungroup() %>%
+  mutate(RTrounded = round(RT,1)) %>%
+  group_by(subject,phase,list) %>%
+  mutate(testOrder = 1:n()) %>% 
+  select(-order) %>%
+  rename(order=testOrder) %>%
+  ungroup() %>% 
+  complete(subject,class,order, cond_list, fill=list(score=0)) %>%group_by(class,order) %>% 
+  summarise(sd = sd(score),
+            acc = mean(score),
+            count = n(),
+            MAD =mad(RT,na.rm=T,constant = 1),
+            RT = median(RT,na.rm=TRUE)) %>% 
+  mutate(unobs = (1-acc)*count)
 ```
 
 ## Subject Performance 
@@ -82,14 +100,50 @@ for (i in unique(CFR_tested$subject)){
 }
 ```
 
+## Output Position Frequency and RT
+```{r agg_plots}
+aggAccPlot <- ggplot(data =agg,
+                     aes(x=factor(order), y=acc,  group=class, linetype=class)) +
+  geom_point(size = 2) +
+  geom_line(size = .75) +
+  geom_errorbar(aes(ymin = acc - sd/sqrt(count), 
+                    ymax =acc + sd/sqrt(count)),
+                  linetype=1,
+                  width=.3) +   
+  scale_y_continuous("Proportion of Occurance") +  
+  scale_x_discrete("Output Position") + 
+  scale_linetype_discrete(name="Condition", labels = c('No Practice',
+                                              'Restudy',
+                                              'Test Practice'))  + 
+  ggtitle("Data vs. PCR: Output Accuracy")
+
+aggRTPlot <- ggplot(data = agg,
+                    aes(x=factor(order), y=RT, group=class, linetype=class)) +
+  geom_point(size =2) +
+  geom_line(size =.75) +
+  geom_errorbar(aes(ymin = RT-(1*MAD),
+                    ymax = RT+(1*MAD)),
+                linetype=1,
+                width=.3) +  
+  scale_y_continuous("Median RT") +
+  scale_x_discrete("Output Item") +
+  scale_linetype_discrete(name="Condition", labels = c('No Practice',
+                                              'Restudy',
+                                              'Test Practice')) + 
+  ggtitle("Data vs. PCR: Reaction Time")
+
+print(aggAccPlot)
+print(aggRTPlot)
+
+```
+
+
 ## RT by Reverse Output Order
 
 Output order is computed only for correct responses, but any RT's are measured relative 
 to the item output immediately prior, even if that item is an intrusion or repeat.
 
-Error bars represent empirical 95% confidence interval
-
-```{r revOrder}
+```{r revOrder,fig.cap="Error bars represent 2.5 and 97.5 percentiles."}
 reversed <- CFR_tested %>% 
   filter(score %in% 1) %>% 
   mutate(testOrder = 1:n()) %>%
@@ -113,7 +167,9 @@ ggplot(data = mRT,
   geom_line(aes(x=1:15),color="red") + 
   geom_text(aes(label = count, y=-2.5)) +
   scale_x_discrete("Item Output",
-                   labels = c("n", paste("n-",1:14,sep='')))
+                   labels = c("n", paste("n-",1:14,sep='')))+
+  scale_y_continuous("Mean RT") +
+  ggtitle("Inter-Retrieval Times by Reverse Output Position")
 
 ```
 

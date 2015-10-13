@@ -16,6 +16,7 @@ vignette: >
 
 ```{r knitr_setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
 library(whoppeR)
+library(Hmisc)
 library(reshape2)
 library(ggplot2)
 library(dplyr)
@@ -84,6 +85,8 @@ IVsummary <- heirarchicalSummary(collapse = c("subject","group"),
                             rawData = cbind(filter(LB4L_allSs,list !=1) ,n=1),
                             w_prac_score = weighted.mean(prac_score,w=n),                            
                             prac_score = mean(prac_score,na.rm=TRUE),
+                            w_final_sd = sqrt(wtd.var(final_score)),
+                            final_sd = sd(final_score),                            
                             w_final_score = weighted.mean(final_score,w=n),                         
                             final_score = mean(final_score),
                             n=sum(n))
@@ -131,7 +134,7 @@ for (i in subs) {
     scale_y_continuous("Final Test Accuracy",expand=c(0,.02)) +
     ggtitle('Conditional Final Test Accuracy')
   
-    cat('<h4 class="subid">', i, '</h4>')
+    cat('<h4 class="subid"> Subject', i, '</h4>')
     grid.arrange(IVplot, conPlot, ncol=2, nrow=1)
 }
 ```
@@ -143,6 +146,10 @@ missings <- condSummary$subject %>% filter(count == 0) %>%
 p_missing <- nrow(missings)/length(unique(condSummary$subject$subject)) 
 
 IVgrouped <- melt(IVsummary$group,
+                  id.vars = c("group","practice","other_type"),
+                  measure.vars = c("prac_score","final_score"),
+                  variable.name = "timepoint", value.name="acc")
+IVgrouped_sd <- melt(IVsummary$group,
                   id.vars = c("group","practice","other_type"),
                   measure.vars = c("prac_score","final_score"),
                   variable.name = "timepoint", value.name="acc")
@@ -205,8 +212,37 @@ condAvergedPlot <- ggplot(filter(condSummary$groups,merged_prac_score %in% 0:1),
   scale_y_continuous("Final Test Accuracy",expand=c(0,.02)) +
   ggtitle('Conditional Final Test Accuracy For Tested Items')
 
-  grid.arrange(IVaveragedPlot, condAvergedPlot, ncol=1,nrow=2)
+print(IVaveragedPlot)
+print(condAvergedPlot)
 ```
+
+```{r simpler_averages,eval=FALSE}
+simplerIVPlot <- ggplot(data = filter(IVsummary$group, is.finite(final_score)),
+                        aes(x = group, y = final_score, ymax=.85, ymin=.15,
+                            color = strSort(interaction(practice,other_type)),
+                            group = strSort(interaction(practice,other_type)))) +
+    geom_point(size=3.25) + 
+    geom_line(size=.75) +
+    geom_errorbar(aes(ymax = final_score + final_sd/sqrt(groupsize),
+                      ymin = final_score - final_sd/sqrt(groupsize)),
+                  width = .075) + 
+    scale_color_discrete("Condition",
+                         breaks = c("C.T","C.NA","NA.S","NA.T"),
+                         labels = c(C.T = "Other Cue", C.NA = "Baseline",
+                                    NA.S  = "Restudy", NA.T = "Same Cue")) + 
+    scale_x_discrete("Group",expand=c(0,.25),
+                     labels=c("Immediate","Delay")) + 
+    ylab("Final Test Accuracy") + 
+    theme(legend.key.height=unit(2,"line")) + 
+    ggtitle('Cued Recall Accuracy')   + 
+    theme_larger()
+  
+simplerCondPlot <- condAvergedPlot + 
+  scale_x_discrete("Final Test Cue", limits=c(NA,'T'),
+                   labels=c("Same Cue","Other Cue")) +
+  theme_larger()
+  
+```  
 
 ```{r tmp, eval=FALSE}
 ## Log odds of conditional data ####
