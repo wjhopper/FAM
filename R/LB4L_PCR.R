@@ -126,9 +126,7 @@ fitLB4L <- function(model,inpar=FALSE,debugLevel = 0) {
 LB4L_PCRss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
                        fixed = c(theta=.5,nFeat=100,nSim=1000,
                                  nList=15,Tmin=NA, Tmax=NA, lambda=NA,Time=NA),
-                       IVdata = filter(LB4L_IV(LB4L_allSs)$subject, subject == 17),
-                       jointData = filter(LB4L_joint(LB4L_allSs)$subject,subject == 17),
-                       fitting=FALSE, ...) {
+                       ...) {
 
   p <- c(free,fixed)
   if (!paramBounds(p)) {
@@ -156,7 +154,7 @@ LB4L_PCRss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   controlAcc <- cuedRecall(controlStrengths, init_thresh, p['space'])
 
   # study practice effects
-  restudyStrengths <- study(init_mem_C1, nFeatures=p['nFeat'],
+  restudyStrengths <- study(mem = init_mem_C1, nFeatures=p['nFeat'],
                             LR = p['LR'], FR = p['F1'])
   # Final test on study practiced items
   restudyAcc<-cuedRecall(restudyStrengths, init_thresh, p['space'])
@@ -172,43 +170,67 @@ LB4L_PCRss <- function(free= c(ER=.52,LR=.2,TR =.03, F1=.05,space=.03),
   testOCStrengths <- init_mem_C2 - rbinom(mxn, init_mem_C2, p['F1'])
   testOCAcc<- cuedRecall(testOCStrengths, testStrengths$thresh, p['space'])
 
-  # Average over simulations
-  avgs <- lapply(list(prac=prac,
-                      C = controlAcc,
-                      S= restudyAcc,
-                      CT = testOCAcc,
-                      CTplus = testOCAcc[prac],
-                      CTneg = testOCAcc[!prac],
-                      CT_not_prac_not_final = (!prac & !testOCAcc),
-                      CT_not_prac_final = (!prac & testOCAcc),
-                      CT_prac_not_final = (prac & !testOCAcc),
-                      CT_prac_final = (prac & testOCAcc),
-                      `T` = testAcc,
-                      Tplus = testAcc[prac],
-                      Tneg = testAcc[!prac],
-                      T_not_prac_not_final = (!prac & !testAcc),
-                      T_not_prac_final = (!prac & testAcc),
-                      T_prac_not_final = (prac & !testAcc),
-                      T_prac_final = (prac & testAcc)),
-                 mean)
+  IV <- data.frame(practice = c("T","T","C","C","S"),
+                   other_type = c(NA,"C",NA,"T",NA),
+                   prac_acc = c(mean(prac),mean(prac), NA, NA, NA),
+                   other_prac_acc = c(NA,NA,mean(prac),mean(prac),NA),
+                   final_acc = unlist(lapply(list(testAcc, NA , controlAcc,
+                                                  testOCAcc, restudyAcc),
+                                      mean)))
+  CD <- data.frame(practice = c("T","T","C","C"),
+                   other_type = c(NA, NA, "T","T"),
+                   prac_score = c(1,0,1,0),
+                   final_acc = unlist(lapply(list(testAcc[prac], testAcc[!prac],
+                                                  testOCAcc[prac], testOCAcc[!prac]),
+                                      mean)))
+  JD <- data.frame(practice = c("T","T","T","T","C","C","C","C"),
+                   other_type = c(NA,NA,NA,NA,"T","T","T","T"),
+                   prac_acc = c(1,0,1,0,1,0,1,0),
+                   final_acc =c(1,1,0,0,1,1,0,0),
+                   acc = unlist(lapply(list((prac & testAcc), (!prac & testAcc),
+                                            (prac & !testAcc),(!prac & !testAcc),
+                                            (prac & testOCAcc), (!prac & testOCAcc),
+                                            (prac & !testOCAcc),(!prac & !testOCAcc)),
+                                       mean)))
 
-  preds <- unlist(avgs)
-  obs <- c(IVdata$final_acc[IVdata$practice %in% c('C','S') & IVdata$other_type!='T'],
-           jointData$acc[(jointData$prac_score %in% 0:1 |
-                           jointData$other_prac_acc %in% 0:1) &
-                         jointData$final_score %in% 0:1])
-  N <- c(IVdata$n[IVdata$practice %in% c('C','S') & IVdata$other_type!='T'],
-         jointData$cell_count[(jointData$prac_score %in% 0:1 |
-                       jointData$other_prac_acc %in% 0:1) &
-                     jointData$final_score %in% 0:1])
-
-  err <- binomialLL(obs=obs[1:2],pred=preds[c("C","S")],N=p['nList']) +
-    multinomialLL(obs = obs[3:10],pred = preds[grepl('T_', names(preds))],
-                  N = p['nList'])
-
-  if (fitting) {
-    return(err)
-  } else {
-    return(list(error=err, preds =avgs))
-  }
+  return(list(IV = IV, CD = CD, JD = JD))
 }
+# Average over simulations
+# avgs <- lapply(list(prac=prac, # done
+#                     C = controlAcc, # done
+#                     S= restudyAcc, # done
+#                     CT = testOCAcc, # done
+#                     CTplus = testOCAcc[prac], # done
+#                     CTneg = testOCAcc[!prac], #done
+#                     CT_not_prac_not_final = (!prac & !testOCAcc),
+#                     CT_not_prac_final = (!prac & testOCAcc),
+#                     CT_prac_not_final = (prac & !testOCAcc),
+#                     CT_prac_final = (prac & testOCAcc),
+#                     `T` = testAcc, # done
+#                     Tplus = testAcc[prac], # done
+#                     Tneg = testAcc[!prac], # done
+#                     T_not_prac_not_final = (!prac & !testAcc), # done
+#                     T_not_prac_final = (!prac & testAcc), # done
+#                     T_prac_not_final = (prac & !testAcc), # done
+#                     T_prac_final = (prac & testAcc)), # done
+#                mean)
+#   preds <- unlist(avgs)
+#   obs <- c(IVdata$final_acc[IVdata$practice %in% c('C','S') & IVdata$other_type!='T'],
+#            jointData$acc[(jointData$prac_score %in% 0:1 |
+#                            jointData$other_prac_acc %in% 0:1) &
+#                          jointData$final_score %in% 0:1])
+#   N <- c(IVdata$n[IVdata$practice %in% c('C','S') & IVdata$other_type!='T'],
+#          jointData$cell_count[(jointData$prac_score %in% 0:1 |
+#                        jointData$other_prac_acc %in% 0:1) &
+#                      jointData$final_score %in% 0:1])
+#
+#   err <- binomialLL(obs=obs[1:2],pred=preds[c("C","S")],N=p['nList']) +
+#     multinomialLL(obs = obs[3:10],pred = preds[grepl('T_', names(preds))],
+#                   N = p['nList'])
+#
+#   if (fitting) {
+#     return(err)
+#   } else {
+#     return(list(error=err, preds =avgs))
+#   }
+# }
