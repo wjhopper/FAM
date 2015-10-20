@@ -221,26 +221,26 @@ simplerIVPlot <- ggplot(data = filter(IVsummary$group, is.finite(final_score)),
                         aes(x = group, y = final_score, ymax=.85, ymin=.15,
                             color = strSort(interaction(practice,other_type)),
                             group = strSort(interaction(practice,other_type)))) +
-    geom_point(size=3.25) + 
-    geom_line(size=.75) +
+    geom_point(size=5) + 
+    geom_line(size=1) +
     geom_errorbar(aes(ymax = final_score + final_sd/sqrt(groupsize),
                       ymin = final_score - final_sd/sqrt(groupsize)),
                   width = .075) + 
-    scale_color_discrete("Condition",
+    scale_color_discrete("Practice\nCondition",
                          breaks = c("C.T","C.NA","NA.S","NA.T"),
                          labels = c(C.T = "Other Cue", C.NA = "Baseline",
                                     NA.S  = "Restudy", NA.T = "Same Cue")) + 
     scale_x_discrete("Group",expand=c(0,.25),
                      labels=c("Immediate","Delay")) + 
     ylab("Final Test Accuracy") + 
-    theme(legend.key.height=unit(2,"line")) + 
+    theme(legend.key.height = unit(2,"line")) + 
     ggtitle('Cued Recall Accuracy')   + 
-    theme_larger()
+    theme_larger(3.25)
   
 simplerCondPlot <- condAvergedPlot + 
-  scale_x_discrete("Final Test Cue", limits=c(NA,'T'),
+  scale_x_discrete("Cue Used During Practice", limits=c(NA,'T'),
                    labels=c("Same Cue","Other Cue")) +
-  theme_larger()
+  theme_larger(3.25)
   
 ```  
 

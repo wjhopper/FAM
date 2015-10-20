@@ -108,11 +108,12 @@ aggAccPlot <- ggplot(data =agg,
   geom_line(size = .75) +
   geom_errorbar(aes(ymin = acc - sd/sqrt(count), 
                     ymax =acc + sd/sqrt(count)),
-                  linetype=1,
-                  width=.3) +   
-  scale_y_continuous("Proportion of Occurance") +  
-  scale_x_discrete("Output Position") + 
-  scale_color_manual(name="Condition", labels=c("Baseline","Restudy","Test Practice"),
+                linetype=1,
+                width=.3) +   
+  scale_y_continuous("Probability of Recalling at Least x Items") +  
+  scale_x_discrete("Output Position (x)") + 
+  scale_color_manual(name="Practice\nCondition",
+                     labels=c("Baseline","Restudy","Test Practice"),
                      values = c('black', 'red', '#00cc00')) + 
   ggtitle("Data vs. PCR: Output Accuracy")
 
@@ -124,9 +125,10 @@ aggRTPlot <- ggplot(data = agg,
                     ymax = RT+(1*MAD)),
                 linetype=1,
                 width=.3) +  
-  scale_y_continuous("Median RT") +
-  scale_x_discrete("Output Item") +
-  scale_color_manual(name="Condition", labels=c("Baseline","Restudy","Test Practice"),
+  scale_y_continuous("Median Inter-Retreival Time of Item x") +
+  scale_x_discrete("Output Position (x)") +
+  scale_color_manual(name="Practice\nCondition",
+                     labels=c("Baseline","Restudy","Test Practice"),
                      values = c('black', 'red', '#00cc00')) + 
   ggtitle("Data vs. PCR: Reaction Time")
 
@@ -164,7 +166,7 @@ ggplot(data = mRT,
   geom_point(color="red") +
   geom_line(aes(x=1:15),color="red") + 
   geom_text(aes(label = count, y=-2.5)) +
-  scale_x_discrete("Item Output",
+  scale_x_discrete("Reverse Output Position",
                    labels = c("n", paste("n-",1:14,sep='')))+
   scale_y_continuous("Mean RT") +
   ggtitle("Inter-Retrieval Times by Reverse Output Position")
