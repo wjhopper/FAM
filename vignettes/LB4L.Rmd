@@ -23,6 +23,7 @@ library(dplyr)
 library(FAM)
 library(grid)
 library(gridExtra)
+library(pander)
 knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE, 
                warning=F, message=FALSE, fig.align='center')
 ```
@@ -78,7 +79,7 @@ print(sub_means_plot)
 
 
 ## Subject Performance 
-```{r allSubjects,results='asis'}
+```{r allSubjects,results='asis',fig.height=4}
 
 IVsummary <- heirarchicalSummary(collapse = c("subject","group"),
                             hold =c("practice","other_type"),
@@ -124,14 +125,15 @@ for (i in subs) {
     geom_bar(position='dodge',stat="identity") +
     # label n observations in each cell
     geom_text(aes(y=-.05,label = count, group=merged_prac_score),
-              position = position_dodge(width=0.9)) +
+              position = position_dodge(width=0.9),
+              size=4) +
     scale_fill_brewer("Practice\nAccuracy",
                       breaks=c(0,1),
                       labels=c("Incorrect", "Correct"),
                       palette="Set1") +
     scale_x_discrete("Final Test Cue", 
                      limits=c(NA,'T'),labels=c("Practiced","Unpracticed")) +
-    scale_y_continuous("Final Test Accuracy",expand=c(0,.02)) +
+    scale_y_continuous("Final Test Accuracy",expand=c(0,.04)) +
     ggtitle('Conditional Final Test Accuracy')
   
     cat('<h4 class="subid"> Subject', i, '</h4>')
@@ -151,8 +153,8 @@ IVgrouped <- melt(IVsummary$group,
                   variable.name = "timepoint", value.name="acc")
 IVgrouped_sd <- melt(IVsummary$group,
                   id.vars = c("group","practice","other_type"),
-                  measure.vars = c("prac_score","final_score"),
-                  variable.name = "timepoint", value.name="acc")
+                  measure.vars = c("final_sd"),
+                  variable.name = "timepoint", value.name="sd")
 IVgrouped$timepoint <- factor(IVgrouped$timepoint,labels=c(1,2))
 #step two: add an unused level to this new factor
 IVgrouped$timepoint <- factor(IVgrouped$timepoint,levels =c(1,2,3))
@@ -214,6 +216,20 @@ condAvergedPlot <- ggplot(filter(condSummary$groups,merged_prac_score %in% 0:1),
 
 print(IVaveragedPlot)
 print(condAvergedPlot)
+```
+
+## Final Test IV ANOVA
+```{r inferentialStats}
+IVanova_data <- IVsummary$subject %>% 
+  filter(is.finite(final_score)) %>%
+  select(subject, group, practice, other_type, final_score) %>%
+  mutate(target_class = interaction(practice,other_type)) %>%
+  select(-practice,-other_type)
+
+IVanova <- aov(final_score ~ group * target_class + Error(subject/target_class),
+               data = IVanova_data)
+pander(summary(IVanova),style="rmarkdown",split.tables=Inf,
+       justify = c("lccccc"))
 ```
 
 ```{r simpler_averages,eval=FALSE}
