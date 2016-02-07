@@ -2,25 +2,20 @@
   position: fixed;
   left: 0;
   top: 0;
-  padding-top:60px;
-  padding-right: 10px;
+  padding: 60px 10px 0 0;
   width: 12.5%;
   height: 100%;
-  overflow:auto;
+  overflow: auto;
   border-right-style: solid;
   border-width: 3px;
   border-color: black;
   background: #eee;
 }
+
 #TOC ul {
   padding-left: 20px;
 }
 
-/*body {
-  margin-left:200px;
-  line-height: 20px;
-}
-*/
 body .main-container {
   padding: 0;
   line-height: 20px;
@@ -73,9 +68,7 @@ table {
 
 .table-condensed {
   margin: 0 auto 20px;
-}
-
-#final-test-iv-anova table {
   max-width: 60%;
 }
+
 
