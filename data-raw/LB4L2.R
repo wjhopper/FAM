@@ -112,7 +112,7 @@ IVsummary <- final %>%
 
 ggplot(data =IVsummary, aes(x = group, y = avgAcc, color = condition,
                             group = condition)) +
-  geom_point(size=5) +
+  geom_point(size=3) +
   geom_line(size=1) +
   geom_errorbar(aes(ymax = avgAcc + sem,
                     ymin = avgAcc - sem),
@@ -178,18 +178,18 @@ tp_RT <- tp %>%
   filter(is.finite(firstPress), is.finite(lastPress)) %>%
   mutate(RT = firstPress-onset) %>%
   group_by(group, test) %>%
-  summarise(avgRT = mean(RT))
+  summarise(medianRT = mean(RT), MAD = mad(RT, constant = 1))
 
 final_RT <- final %>%
   filter(is.finite(firstPress), is.finite(lastPress)) %>%
   mutate(RT = firstPress-onset) %>%
   group_by(group, condition) %>%
-  summarise(avgRT = mean(RT))
+  summarise(medianRT = median(RT), MAD = mad(RT, constant = 1))
 
 
-ggplot(data = final_RT, aes(x = group, y = avgRT, color = condition,
-                            group = condition)) +
-  geom_point(size=5, shape = 2) +
+ggplot(data = final_RT,
+       aes(x = group, y = medianRT, color = condition, group = condition)) +
+  geom_point(size=3, shape = 2) +
   geom_line(size=1) +
   scale_color_discrete("Practice\nCondition",
                        breaks = c("C.C","C.S","C.T","S.C","T.C"),
@@ -197,6 +197,6 @@ ggplot(data = final_RT, aes(x = group, y = avgRT, color = condition,
                                   C.T = "Other Cue Test", T.C = "Test Same Cue")) +
   scale_x_discrete("Group",expand=c(0,.25), limits = c("immediate", "delay"),
                    labels=c("Immediate","Delay")) +
-  ylab("Accuracy") +
+  ylab("Median First-Press Latency") +
   theme(legend.key.height = unit(2,"line")) +
   ggtitle('Final Test')
