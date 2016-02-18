@@ -30,7 +30,7 @@ stopifnot(all(vapply(list(spFList,tpFList,fFList),
 # since it has the full design for each each list
 study <- data.frame(do.call(rbind,lapply(sFList, read.csv)), phase = "study") %>%
   group_by(subject) %>%
-  mutate(trial = 1:n())
+  mutate(trial = 1:n()) %>%
   ungroup() %>%
   replace_na(list(test = FALSE)) %>%
   mutate(pracFactor  = factor(replace(practice, practice=='', 'C'))) %>%
@@ -44,7 +44,7 @@ sp <- data.frame(do.call(rbind,lapply(spFList, read.csv)), phase = "practice")
 
 # Now test practice data
 tp <- data.frame(do.call(rbind,lapply(tpFList, read.csv)), phase = "practice") %>%
-  mutate(practice = 'T')
+  mutate(practice = 'T', test = replace(test, !is.finite(test), 0))
 final <- data.frame(do.call(rbind,lapply(fFList, read.csv)), phase = "final")
 
 ## Step 1: Score the data ####
@@ -171,3 +171,32 @@ ggplot(F_given_R1R2_joint,
   geom_point(size = 3) +
   facet_grid(test ~ group) +
   scale_x_discrete("Joint Practice Accuracy")
+
+
+## RT Analysis ####
+tp_RT <- tp %>%
+  filter(is.finite(firstPress), is.finite(lastPress)) %>%
+  mutate(RT = firstPress-onset) %>%
+  group_by(group, test) %>%
+  summarise(avgRT = mean(RT))
+
+final_RT <- final %>%
+  filter(is.finite(firstPress), is.finite(lastPress)) %>%
+  mutate(RT = firstPress-onset) %>%
+  group_by(group, condition) %>%
+  summarise(avgRT = mean(RT))
+
+
+ggplot(data = final_RT, aes(x = group, y = avgRT, color = condition,
+                            group = condition)) +
+  geom_point(size=5, shape = 2) +
+  geom_line(size=1) +
+  scale_color_discrete("Practice\nCondition",
+                       breaks = c("C.C","C.S","C.T","S.C","T.C"),
+                       labels = c(C.C = "Baseline", C.S ="Other Cue Study", S.C  = "Restudy",
+                                  C.T = "Other Cue Test", T.C = "Test Same Cue")) +
+  scale_x_discrete("Group",expand=c(0,.25), limits = c("immediate", "delay"),
+                   labels=c("Immediate","Delay")) +
+  ylab("Accuracy") +
+  theme(legend.key.height = unit(2,"line")) +
+  ggtitle('Final Test')
