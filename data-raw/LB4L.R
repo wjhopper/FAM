@@ -2,7 +2,7 @@
 library(dplyr)
 library(whoppeR)
 
-flist <- list.files("data-raw", pattern="LB4L+.+csv", full.names = TRUE)
+flist <- list.files("data-raw", pattern="LB4L_+.+csv", full.names = TRUE)
 rawData <-lapply(flist, read.csv, header=T, sep=',',
            col.names=c('subject','group','version','datetime','exp_onset',
                        'list','repeating','practice','cue','target',
