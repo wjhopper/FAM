@@ -9,7 +9,24 @@ output:
     toc_depth: 2
     css: custom.css
 vignette: >
-  %\VignetteIndexEntry{LB4L: All 2 Cues}
+  %\VignetteIndexEntry{LB4L2: All 2 Cues}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
+
+```{r setup, include=FALSE}
+library(FAM)
+library(dplyr)
+library(whoppeR)
+library(ggplot2)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
+
+## Accuracy by Experimental Condition
+```{r, fig.align='center'}
+IV_acc <- summary(LB4L2_final, level = "group")
+autoplot(IV_acc)
+IV_RT <- summary(LB4L2_final, level= "group", DV = "RT")
+autoplot(IV_RT)
+```
+
