@@ -69,16 +69,15 @@ stopifnot(all(vapply(list(spFList,tpFList,fFList),
 
 ## Step 2: Read the data files in each group into their own table #####
 
-## Start with study data and build a 'condition' index column on the study table
-# since it has the full design for each each list
+## Start with study data
 study <- data.frame(do.call(rbind,lapply(sFList, read.csv)), phase = "study") %>%
-  group_by(subject) %>%
-  mutate(trial = 1:n()) %>%
-  ungroup() %>%
   replace_na(list(test = FALSE)) %>%
   mutate(practice = replace(practice, practice == '', 'N')) %>%
+  group_by(subject) %>%
+  mutate(trial = 1:n()) %>%
   group_by(subject, target) %>%
-  mutate(OCpractice = rev(practice))
+  mutate(OCpractice = rev(practice)) %>%
+  ungroup()
 
 # Now study practice data
 sp <- data.frame(do.call(rbind,lapply(spFList, read.csv)), phase = "practice")
@@ -89,7 +88,7 @@ tp <- data.frame(do.call(rbind,lapply(tpFList, read.csv)), phase = "practice") %
          RT = firstPress-onset) %>%
   group_by(subject, list, cue, round) %>%
   mutate(acc = score(target,response))
-tp <- manual_scoring(tp)
+tp <- ungroup(manual_scoring(tp))
 
 # Now final test data
 final <- data.frame(do.call(rbind,lapply(fFList, read.csv)), phase = "final") %>%
@@ -97,81 +96,35 @@ final <- data.frame(do.call(rbind,lapply(fFList, read.csv)), phase = "final") %>
          RT = firstPress - onset) %>%
   group_by(subject, list, cue) %>%
   mutate(acc = score(target,response))
-final <- manual_scoring(final)
+final <- ungroup(manual_scoring(final))
 
 # Join the other-cue practice and condition columns from the study
 # table onto the final test table
-LB4L2_final  <- study %>%
+final  <- study %>%
   select(subject:target, OCpractice) %>%
   right_join(select(final,-test),
              by = c("subject", "group", "list", "cue","target")) %>%
   mutate(RT = firstPress-onset) %>%
-  select(subject:target, practice, OCpractice, response, onset, firstPress, lastPress, acc, RT) %>%
-  as.LB4L_IV()
-
-devtools::use_data(LB4L2_final)
-
-LB4L2_study <- study
-devtools::use_data(LB4L2_study)
-
-LB4L2_tp <- tp
-devtools::use_data(LB4L2_tp)
-
-LB4L2_sp <- sd
-devtools::use_data(LB4L2_sp)
+  select(subject:target, practice, OCpractice, response, onset, firstPress, lastPress, acc, RT)
 
 
-## TBD
-tested <- tp %>%
-  replace_na(list(test = FALSE)) %>%
-  select(subject:target, test, round, acc) %>%
-  spread(round, acc) %>%
-  rename(round1 = `1`, round2= `2`) %>%
-  left_join(select(final, subject:target, acc),
-            by = c("subject", "group", "list", "target")) %>%
-  select(subject:list, pracCue = cue.x, finalCue = cue.y, target,
-         sameCue = test, round1, round2, final=acc) %>%
-  mutate(sameCue = factor(sameCue, labels = c('no','yes')))
+overwrite_flag <- FALSE
 
-F_given_R1acc <- tested %>%
-  group_by(group, test, round1) %>%
-  summarise(condAcc = mean(finalAcc), sdAcc = sd(finalAcc), groupN = length(unique(subject))) %>%
-              mutate(sem = sdAcc/sqrt(groupN))
-F_given_R2acc <- tested %>%
-  group_by(group, test, round2) %>%
-  summarise(condAcc = mean(finalAcc), sdAcc = sd(finalAcc), groupN = length(unique(subject))) %>%
-  mutate(sem = sdAcc/sqrt(groupN))
-R2_given_R1 <- tested %>%
-  group_by(group, test, round1) %>%
-  summarise(condAcc = mean(round2), sdAcc = sd(round2), groupN = length(unique(subject))) %>%
-  mutate(sem = sdAcc/sqrt(groupN)) %>%
-  ungroup() %>%
-  complete(group, test, round1)
-R1_R2_joint  = tested %>%
-  group_by(group, test, round1, round2) %>%
-  summarise(n = n()) %>%
-  group_by(group, test) %>%
-  mutate(jointAcc = n/sum(n))
-F_given_R1R2_joint <- tested %>%
-  group_by(group, test, round1, round2) %>%
-  summarise(condAcc = mean(finalAcc), sdAcc = sd(finalAcc), groupN = length(unique(subject))) %>%
-  mutate(sem = sdAcc/sqrt(groupN)) %>%
-  ungroup() %>%
-  complete(group, test, round1)
+LB4L2_final <- as.LB4L(final)
+attr(LB4L2_final,"experiment") <- "LB4L2"
+devtools::use_data(LB4L2_final,overwrite = overwrite_flag)
 
-ggplot(F_given_R1R2_joint,
-       aes(x = interaction(round1,round2), y = condAcc)) +
-  geom_point(size = 3) +
-  facet_grid(test ~ group) +
-  scale_x_discrete("Joint Practice Accuracy")
+LB4L2_study <- as.LB4L(study)
+attr(LB4L2_study,"experiment") <- "LB4L2"
+devtools::use_data(LB4L2_study,overwrite = overwrite_flag)
 
+LB4L2_tp <- as.LB4L(tp)
+attr(LB4L2_tp ,"experiment") <- "LB4L2"
+devtools::use_data(LB4L2_tp,overwrite = overwrite_flag)
 
-## RT Analysis ####
-tp_RT <- tp %>%
-  filter(is.finite(firstPress), is.finite(lastPress)) %>%
-  mutate(RT = firstPress-onset) %>%
-  group_by(group, test) %>%
-  summarise(medianRT = mean(RT), MAD = mad(RT, constant = 1))
+LB4L2_sp <- as.LB4L(sp)
+attr(LB4L2_sp ,"experiment") <- "LB4L2"
+devtools::use_data(LB4L2_sp,overwrite = overwrite_flag)
 
 
 
