@@ -10,7 +10,6 @@
 #' of the S3 classes implemented by the \code{\link{FAM}} package.
 #' @name FAM_classes
 #'
-#' @param data An R object that is, or can be coerced to, a data frame.
 #' @param x an R object
 #'
 #' @return The \code{as*} functions (e.g.,\code{as.LB4L_IV}, \code{as.LB4L_IV_summary})

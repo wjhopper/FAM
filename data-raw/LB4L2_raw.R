@@ -5,7 +5,7 @@ library(whoppeR)
 library(tidyr)
 source(file.path("R", "LB4L2.R"))
 
-manual_scoring <- function(data) {
+manual_scoring <- function(data, prefix) {
 
   scoring_loop <- function(data_to_score) {
     has_been_scored <- data_to_score$acc %in% c(0,1)
@@ -15,8 +15,7 @@ manual_scoring <- function(data) {
     }
   }
 
-  prefix <- as.character(as.list(match.call())$data)
-  clean_path <- file.path("data-raw", paste("LB4L2", prefix, "cleaned.Rdata", sep = "_"))
+  clean_path <- file.path("data-raw", paste(prefix, "cleaned.Rdata", sep = "_"))
   scoring_cols <- c("subject","target", "response")
 
   # if the cleaned file exists, load it
@@ -70,62 +69,63 @@ stopifnot(all(vapply(list(spFList,tpFList,fFList),
 ## Step 2: Read the data files in each group into their own table #####
 
 ## Start with study data
-study <- data.frame(do.call(rbind,lapply(sFList, read.csv)), phase = "study") %>%
-  replace_na(list(test = FALSE)) %>%
+study <- data.frame(do.call(rbind,lapply(sFList, read.csv))) %>%
+  replace_na(list(test = 0)) %>%
   mutate(practice = replace(practice, practice == '', 'N')) %>%
   group_by(subject) %>%
   mutate(trial = 1:n()) %>%
   group_by(subject, target) %>%
   mutate(OCpractice = rev(practice)) %>%
-  ungroup()
+  group_by(subject)
 
 # Now study practice data
-sp <- data.frame(do.call(rbind,lapply(spFList, read.csv)), phase = "practice")
+sp <- data.frame(do.call(rbind,lapply(spFList, read.csv))) %>%
+  select(subject:target, test, onset) %>%
+  mutate(test = ifelse(test == 1, "yes", "no")) %>%
+  rename(sameCue = test) %>%
+  group_by(subject) %>%
+  mutate(trial = 1:n()) %>%
+  group_by(subject)
+
 
 # Now test practice data
-tp <- data.frame(do.call(rbind,lapply(tpFList, read.csv)), phase = "practice") %>%
-  mutate(practice = 'T', test = replace(test, !is.finite(test), 0),
+tp <- data.frame(do.call(rbind,lapply(tpFList, read.csv))) %>%
+  mutate(test = ifelse(is.na(test), "no", "yes"),
          RT = firstPress-onset) %>%
-  group_by(subject, list, cue, round) %>%
-  mutate(acc = score(target,response))
-tp <- ungroup(manual_scoring(tp))
+  select(-practice, sameCue = test) %>%
+  group_by(subject, list, cue, round)  %>%
+  mutate(acc = score(target,response)) %>%
+  ungroup() %>%
+  manual_scoring(prefix = "LB4L2_tp") %>%
+  group_by(subject, group, sameCue)
+
 
 # Now final test data
-final <- data.frame(do.call(rbind,lapply(fFList, read.csv)), phase = "final") %>%
-  mutate(practice = replace(practice, practice=='', 'N'),
+# Join the other-cue practice column from study
+final <- data.frame(do.call(rbind,lapply(fFList, read.csv))) %>%
+  mutate(practice = NULL,
          RT = firstPress - onset) %>%
   group_by(subject, list, cue) %>%
-  mutate(acc = score(target,response))
-final <- ungroup(manual_scoring(final))
-
-# Join the other-cue practice and condition columns from the study
-# table onto the final test table
-final  <- study %>%
-  select(subject:target, OCpractice) %>%
-  right_join(select(final,-test),
-             by = c("subject", "group", "list", "cue","target")) %>%
-  mutate(RT = firstPress-onset) %>%
-  select(subject:target, practice, OCpractice, response, onset, firstPress, lastPress, acc, RT)
-
+  mutate(acc = score(target,response)) %>%
+  ungroup() %>%
+  manual_scoring(prefix = "LB4L2_final") %>%
+  left_join(select(study, subject:practice, OCpractice),
+            by = c("subject", "group", "list", "cue", "target")) %>%
+  select(subject:target,practice, OCpractice, onset:acc) %>%
+  group_by(subject, group, practice, OCpractice)
 
 overwrite_flag <- FALSE
+phase_names <- list(study = "LB4L2_study", study_practice = "LB4L2_sp",
+                    test_practice = "LB4L2_tp", final = "LB4L2_final")
 
-LB4L2_final <- as.LB4L(final)
-attr(LB4L2_final,"experiment") <- "LB4L2"
+LB4L2_final <- as_LB4L(final, tables = phase_names, experiment = "LB4L2", practice_tests = 2)
 devtools::use_data(LB4L2_final,overwrite = overwrite_flag)
 
-LB4L2_study <- as.LB4L(study)
-attr(LB4L2_study,"experiment") <- "LB4L2"
+LB4L2_study <- as_LB4L(study, tables = phase_names, experiment = "LB4L2", practice_tests = 2)
 devtools::use_data(LB4L2_study,overwrite = overwrite_flag)
 
-LB4L2_tp <- as.LB4L(tp)
-attr(LB4L2_tp ,"experiment") <- "LB4L2"
+LB4L2_tp <- as_LB4L(tp, tables = phase_names, experiment = "LB4L2", practice_tests = 2)
 devtools::use_data(LB4L2_tp,overwrite = overwrite_flag)
 
-LB4L2_sp <- as.LB4L(sp)
-attr(LB4L2_sp ,"experiment") <- "LB4L2"
+LB4L2_sp <- as_LB4L(sp, tables = phase_names, experiment = "LB4L2", practice_tests = 2)
 devtools::use_data(LB4L2_sp,overwrite = overwrite_flag)
-
-
-
-
