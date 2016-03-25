@@ -22,6 +22,32 @@ library(ggplot2)
 knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 ```
 
+```{r tests, include=FALSE, eval=FALSE}
+## accuracy as IV 
+IV_acc <- summary(LB4L2_final, level = "group")
+IV_acc_sub <- summary(LB4L2_final, level = "subject")
+CD_acc <- summary(LB4L2_final, level = "group", given_practice = TRUE)
+raw_CD_acc <- summary(LB4L2_final, level = "raw", given_practice = TRUE)
+raw_joint_acc <- summary(LB4L2_final, level = "raw", given_practice = TRUE, given_final = TRUE)
+identical(summary(LB4L2_final, level = "group", given_practice = 1:2), CD_acc)
+CD_acc_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
+CD_acc_2 <- summary(LB4L2_final, level = "group", given_practice = 2)
+joint_acc <- summary(LB4L2_final, level = "group", given_practice = TRUE, given_final = TRUE)
+joint_acc_1 <- summary(LB4L2_final, level = "group", given_practice = 1, given_final = TRUE)
+joint_acc_2 <- summary(LB4L2_final, level = "group", given_practice = 2, given_final = TRUE)
+
+# RT as DV
+IV_RT <- summary(LB4L2_final, level= "group", DV = "RT", given_final = FALSE)
+IV_RT_sub <- summary(LB4L2_final, level= "subject", DV = "RT", given_final = FALSE)
+CD_RT <- summary(LB4L2_final, level = "group", DV = "RT")
+CD_RT_sub <- summary(LB4L2_final, level = "subject", DV = "RT")
+CD_RT_prac <- summary(LB4L2_final, level = "group", DV = "RT", given_practice = TRUE)
+identical( summary(LB4L2_final, level = "group", DV = "RT", given_practice = 1:2), CD_RT_prac)
+CD_RT_prac1 <- summary(LB4L2_final, level = "group", DV = "RT", given_practice = 1)
+CD_RT_prac2 <- summary(LB4L2_final, level = "group", DV = "RT", given_practice = 2)
+```
+
+
 ## Accuracy by Experimental Condition
 ```{r, fig.align='center'}
 IV_acc <- summary(LB4L2_final, level = "group")

@@ -19,8 +19,11 @@ the response.}
 
 \item{level}{A character vector of length one, used for determing the level
 of the summary. If the value is \code{"subject"} (the default) then the means
-for each subject are returned, and if the value is \code{"group"} then the means
-of each experimental condition is returned, aggregated over individual subjects.}
+for each subject are returned. If the value is \code{"group"} then the means
+of each experimental condition is returned, aggregated over individual subjects.
+If the value is "raw", then the raw data is returned without any aggregation.
+This options is useful along with \code{given_practice = TRUE} to retreive the
+raw joint data.}
 
 \item{given_practice}{A numeric vector listing which practice tests should be
 used as grouping variables for calculating conditional final test averages. A logical
@@ -29,7 +32,9 @@ all practice tests should be used, or no practice test should be used.}
 
 \item{given_final}{A logical vector of length one, indicating whether or not
 group observations for specific targets according to the accuracy outcome on the final test.
-Only used when the value of the \code{DV} argument is \code{"RT"}.}
+If this argument is set to \code{TRUE}, given_practice is set to \code{TRUE},
+and the DV is set to \code{"accuracy"}, then the joint distribution of practice and final
+test outcomes is returned}
 }
 \description{
 The LB4L2 experiment data is stored in 4 different data sets, each corresponding

@@ -14,15 +14,20 @@
 #' the response.
 #' @param level A character vector of length one, used for determing the level
 #' of the summary. If the value is \code{"subject"} (the default) then the means
-#' for each subject are returned, and if the value is \code{"group"} then the means
+#' for each subject are returned. If the value is \code{"group"} then the means
 #' of each experimental condition is returned, aggregated over individual subjects.
+#' If the value is "raw", then the raw data is returned without any aggregation.
+#' This options is useful along with \code{given_practice = TRUE} to retreive the
+#' raw joint data.
 #' @param given_practice A numeric vector listing which practice tests should be
 #' used as grouping variables for calculating conditional final test averages. A logical
 #' vector of length one (i.e., \code{TRUE} or \code{FALSE} can be used to indicate
 #' all practice tests should be used, or no practice test should be used.
 #' @param given_final A logical vector of length one, indicating whether or not
 #' group observations for specific targets according to the accuracy outcome on the final test.
-#' Only used when the value of the \code{DV} argument is \code{"RT"}.
+#' If this argument is set to \code{TRUE}, given_practice is set to \code{TRUE},
+#' and the DV is set to \code{"accuracy"}, then the joint distribution of practice and final
+#' test outcomes is returned
 #'
 #' @note Trials where no keys were pressed by the participant are excluded from
 #' the RT summary.
@@ -33,20 +38,12 @@ summary.LB4L <- function(data, DV = "accuracy", level = "subject",
                          given_practice = FALSE, given_final = (DV == "RT")) {
 
   level <- tolower(level)
-  if ( length(level) > 1 || !(level %in% c("subject", "group")) ) {
-    stop('level argument must be either "subject" or "group"')
+  if ( length(level) > 1 || !(level %in% c("subject", "group", "raw")) ) {
+    stop('level argument must be either "subject", "group", or "raw"')
   }
 
   if ( length(DV) > 1 || !(DV %in% c("RT", "accuracy"))) {
     stop('DV argument must be either "RT" or "accuracy"')
-  }
-
-  if (any(given_practice > 0) && level == "subject" && DV == "accuracy") {
-    stop("Cannot calculate conditional accuracy averages at the subject level")
-  }
-
-  if (given_final && DV == "accuracy") {
-    stop("'given_final' must be FALSE if the DV is accuracy")
   }
 
   if (DV == "RT") {
@@ -62,94 +59,159 @@ summary.LB4L <- function(data, DV = "accuracy", level = "subject",
     DVfun <- accuracy
   }
 
-  if (given_final || any(given_practice > 0)) {
-    newClass <- as.LB4L_CD_summary
-  } else {
-    newClass <- as.LB4L_IV_summary
+  if (!all(is.numeric(given_practice) || is.logical(given_practice),
+           is.numeric(given_final) || is.logical(given_final))) {
+    stop("'given_practice' and 'given_final' arguments must be logical scalars or numeric vectors")
   }
 
-  if (given_final && !all(given_practice > 0)) {
-    given <- "final_acc"
+  data <- rename(data, final_acc = acc, final_RT = RT)
 
-  } else if (all(given_practice > 0)) {
-    given <- vector(mode = "list",length = 2L)
-    names(given) <- c("tp_data", "vars")
+  if (!any(given_practice > 0) && given_final) {
+    data <- DVfun(data, level = level,
+                  conditional_vars = "final_acc")
 
-    tp <- get(paste0(attr(data,"experiment"),"_tp"))
-    if (is.numeric(given_practice) && "round" %in% names(tp)) {
-      tp <- filter(tp, round %in% given_practice)
-    } else if (identical(given_practice, TRUE) && "round" %in% names(tp)) {
-      given_practice <- sort(unique(tp$round))
+  } else if (is.numeric(given_practice) && all(given_practice > 0)) {
+    rounds <- 1:attr(data,"practice_tests")
+    given_data <- get(attr(data,"tables")$test_practice)
+
+    if (!setequal(given_practice, rounds)) {
+      given_data <- filter(given_data, round %in% given_practice)
     }
 
-    given[[1]] <- tp
-    given[[2]] <- c(paste0("practice", as.numeric(given_practice),"acc")[given_practice>0],
-                  "final_acc"[given_final])
+    if (given_final) {
+      conditional_vars <- c(paste0("practice", given_practice, "acc"), "final_acc")
+    } else {
+      conditional_vars <- paste0("practice", given_practice, "acc")
+    }
+
+    data <- DVfun(data, level = level,
+                  given_data = given_data,
+                  conditional_vars = conditional_vars)
+
+  } else if (identical(given_practice, TRUE)) {
+    given_practice <- 1:attr(data,"practice_tests")
+    given_data <- get(attr(data,"tables")$test_practice)
+
+    if (given_final) {
+      conditional_vars <- c(paste0("practice", given_practice,"acc"), "final_acc")
+    } else {
+      conditional_vars <- paste0("practice", given_practice,"acc")
+    }
+
+    data <- DVfun(data, level = level,
+                  given_data = given_data,
+                  conditional_vars = conditional_vars)
+
   } else {
-    given <- NULL
+    data <- DVfun(data, level = level)
   }
 
-  data %>%
-    DVfun(group_level = (level == 'group'), given = given) %>%
-    ungroup() %>% newClass() %>%
-    return()
+  return(data)
 }
 
 # Internal function for de-normalizing the test practice data to make a column
 # for each round of test practice
-tp_reshaping <- function(tp_data, DV) {
-  spread_names <- as.character(unique(LB4L2_tp$round))
+#' @importFrom tidyr spread_
+reshaping <- function(given_data, conditional_vars, DV) {
+
+  size <- unique(given_data$round)
+  spread_names <- as.character(size)
   prefixed_names <- paste0("practice", spread_names, DV)
-  LB4L2_tp %>%
-    select(subject:target, test, round, acc) %>%
-    spread(round, acc) %>%
-    rename_(.dots=setNames(sapply(spread_names,as.name),
-                           prefixed_names)) %>%
-    return()
-}
 
-# Internal funcion for summarizing accuracy data from LB4L experiments
-accuracy <- function(data, group_level, given) {
+  if (length(size) == 1) {
+    given_data <- rename_(given_data, .dots = setNames(DV, prefixed_names))
 
-  if (!is.null(given)) {
-    grouping_vars <- c("subject", "group", "sameCue", given$vars)
-
-    if (sum(grepl("practice*", given$vars)) == 1) {
-      given$tp_data <- rename(given$tp_data, practice1_acc = acc)
-
-    } else if (sum(grepl("practice*", given$vars)) > 1) {
-      given$tp_data <- tp_reshaping(given$tp_data, DV = "acc")
-    }
-
-    data <- given$tp_data %>%
-      left_join(select(data, subject:target, acc),
-                by = c("subject", "group", "list", "target")) %>%
-      select(subject:list, pracCue = cue.x, finalCue = cue.y,
-             sameCue = test, target, starts_with("practice"), final_acc = acc) %>%
-      mutate(sameCue = factor(sameCue, labels = c('no','yes')))
-
-  } else {
-    grouping_vars <-  c("subject","group", "practice", "OCpractice")
-    data <- rename(data, final_acc=acc)
+  } else if (length(size) > 1) {
+    spread_names <- as.character(unique(given_data$round))
+    prefixed_names <- paste0("practice", spread_names, DV)
+    given_data <- given_data %>%
+      select_("subject:sameCue", "round", .dots = DV) %>%
+      spread_("round", DV) %>%
+      rename_(.dots=setNames(sapply(spread_names,as.name),
+                             prefixed_names))
   }
 
-  summarized_data <- data %>%
-    group_by_(.dots = grouping_vars) %>%
-    summarise(avg_final_acc = mean(final_acc), nObs = n())
+  return(given_data)
+}
 
-  if (group_level) {
-    summarized_data <- summarized_data %>%
-      group_by_(.dots = grouping_vars[grouping_vars != "subject"]) %>%
-      summarise(sd_final_acc = sd(avg_final_acc),
-                w_sd_final_acc = sqrt(wtd.var(avg_final_acc, nObs)),
-                w_avg_final_acc = weighted.mean(avg_final_acc, nObs),
-                avg_final_acc = mean(avg_final_acc),
-                nObs = sum(nObs),
-                N = length(unique(subject))) %>%
-      mutate(sem_final_acc = sd_final_acc/sqrt(N)) %>%
-      select_(.dots = c(grouping_vars[grouping_vars != "subject"],"avg_final_acc",
-                        "sd_final_acc", "nObs", "N", "w_avg_final_acc", "w_sd_final_acc"))
 
+# Internal funcion for summarizing accuracy data from LB4L experiments
+#' @importFrom tidyr expand_ replace_na
+accuracy <- function(data, level, given_data = NULL, conditional_vars = NULL) {
+
+  if (any(grepl("practice", conditional_vars))) {
+    data <- ungroup(data) %>%
+      select(subject:target, final_acc) %>%
+      left_join(x = reshaping(given_data, conditional_vars, DV = "acc"),
+                y = ., by = c("subject", "group", "list", "target")) %>%
+      select(subject:list, pracCue = cue.x, finalCue = cue.y,
+             target, sameCue, starts_with("practice"), final_acc)
+  }
+
+  if (level == "raw") {
+    return(data)
+  }
+
+  unconditional_vars <- vapply(groups(data), as.character, character(1L))
+  data <- group_by_(data, .dots = conditional_vars, add = TRUE)
+
+  if (any(grepl("final", conditional_vars))) {
+
+    fill_vars <- c(unconditional_vars[unconditional_vars != "group"],
+                   conditional_vars)
+    possible_n <- data %>%
+      group_by_(.dots = unconditional_vars) %>%
+      summarise(cell_max = n())
+
+    summarized_data <- data %>%
+      summarise(freq = n()) %>%
+      left_join(possible_n) %>%
+      mutate(probability = freq/cell_max) %>%
+      select(-freq) %>%
+      left_join(x = expand_(ungroup(.), fill_vars), y = .) %>%
+      replace_na(list(probability = 0)) %>%
+      group_by_(.dots = unconditional_vars[unconditional_vars != "group"]) %>%
+      mutate_each(funs = funs(replace(., is.na(.), first(.[!is.na(.)]))),
+                  group, cell_max)
+
+    if (level == "group") {
+      # grouping_vars <- vapply(groups(data), as.character, character(1L))
+      possible_n <- distinct(select(ungroup(possible_n), -subject))
+      summarized_data <- summarized_data %>%
+        group_by_(.dots = c(unconditional_vars[unconditional_vars != "subject"],
+                            conditional_vars)) %>%
+        left_join(possible_n) %>%
+        summarise(probability = mean(probability))
+    }
+
+    summarized_data <- as_LB4L_joint_summary(summarized_data)
+
+  } else {
+    summarized_data <- data %>%
+      summarise(avg_final_acc = mean(final_acc),
+                nObs = n())
+
+    if (level == "group") {
+      grouping_vars <- vapply(groups(data), as.character, character(1L))
+      summarized_data <- summarized_data %>%
+        group_by_(.dots = grouping_vars[grouping_vars != "subject"]) %>%
+        summarise(sd_final_acc = sd(avg_final_acc),
+                  w_sd_final_acc = sqrt(wtd.var(avg_final_acc, nObs)),
+                  w_avg_final_acc = weighted.mean(avg_final_acc, nObs),
+                  avg_final_acc = mean(avg_final_acc),
+                  nObs = sum(nObs),
+                  N = length(unique(subject))) %>%
+        mutate(sem_final_acc = sd_final_acc/sqrt(N)) %>%
+        select_(.dots = c(grouping_vars[grouping_vars != "subject"],
+                          "avg_final_acc", "sd_final_acc", "sem_final_acc",
+                          "nObs", "N", "w_avg_final_acc", "w_sd_final_acc"))
+    }
+
+    if (any(grepl("practice[0-9]+", conditional_vars))) {
+      summarized_data <- as_LB4L_CD_summary(summarized_data)
+    } else {
+      summarized_data <- as_LB4L_IV_summary(summarized_data)
+    }
   }
 
   return(summarized_data)
@@ -157,56 +219,55 @@ accuracy <- function(data, group_level, given) {
 
 
 # Internal method for summarizing RT data from LB4L experiments
-RT <- function(data, group_level, given = NULL) {
+RT <-function(data, level, given_data = NULL, conditional_vars = NULL) {
 
-  data <- filter(data, is.finite(RT)) %>%
-    rename(final_acc=acc, final_RT = RT)
-
-  if (!is.null(given) && is.list(given)) {
-    grouping_vars <- c("subject", "group", "sameCue", given$vars)
-    given$tp_data <- given$given$tp_data %>%
-      filter(is.finite(RT))
-
-    if (sum(grepl("practice*", given$vars)) == 1) {
-      given$tp_data <- rename(given$tp_data, practice1_acc = acc)
-
-    } else if (sum(grepl("practice*", given$vars)) > 1) {
-      given$tp_data <- full_join(tp_reshaping(given$tp_data, DV = "acc"),
-                                 tp_reshaping(given$tp_data, DV = "RT"))
-    }
-
-    data <- given$tp_data %>%
-      left_join(select(data, subject:target, acc, RT),
-                by = c("subject", "group", "list", "target")) %>%
-      select(subject:list, pracCue = cue.x, finalCue = cue.y, ameCue = test,
-             target, starts_with("practice"), final_acc, final_RT) %>%
-      mutate(sameCue = factor(sameCue, labels = c('no','yes')))
-
-  } else if (!is.null(given) && !is.list(given)) {
-    grouping_vars <- c("subject", "group", "practice", "OCpractice", given)
-  } else {
-    grouping_vars <-  c("subject","group", "practice", "OCpractice")
+  if (!is.null(given_data) && any(grepl("practice*", conditional_vars))) {
+    given_data <- given_data %>% filter(is.finite(RT))
+    data <- ungroup(data) %>%
+      select(subject:target, final_acc, final_RT) %>%
+      left_join(x = reshaping(given_data, conditional_vars, DV = "acc"),
+               y = .,
+               by = c("subject", "group", "list", "target")) %>%
+      left_join(x = reshaping(given_data, conditional_vars, DV = "RT"),
+                y = .,
+                by = c("subject", "group", "list", "target", "sameCue")) %>%
+      select(subject:list, pracCue = cue.x, finalCue = cue.y,
+             target, sameCue, starts_with("practice"), final_acc, final_RT)
   }
 
-  if (group_level) {
-    summarized_data <- data %>%
+  if (level == "raw") {
+    return(data)
+  }
+
+  grouping_vars <- c(vapply(groups(data), as.character, character(1L)), conditional_vars)
+  unconditional_vars <- vapply(groups(data), as.character, character(1L))
+  data <- ungroup(data) %>%
+    filter( !(Reduce('|', lapply(data[,grepl("RT", names(data))], is.na))) ) %>%
+    group_by_(.dots = grouping_vars)
+
+  summarized_data <- data %>%
+    summarise_each(~median, contains("RT")) %>%
+    left_join(summarise(data, nObs = n()))
+
+  if (level == "group") {
+    counts <- summarized_data %>%
       group_by_(.dots = grouping_vars[grouping_vars != "subject"]) %>%
-      summarise(medianRT = median(final_RT),
-                MAD = mad(final_RT, constant = 1),
-                nObs = n(),
-                N = length(unique(subject))) %>%
-      select_(.dots = c(grouping_vars[grouping_vars != "subject"],
-                        "medianRT"," MAD", "nObs"," N"))
+      summarise(nObs = sum(nObs),
+                N = length(unique(subject)))
+    summarized_data <- summarized_data %>%
+      group_by_(.dots = grouping_vars[grouping_vars != "subject"]) %>%
+      summarise_each(funs = funs('median_RT' = median, mad(., constant = 1)), contains("RT")) %>%
+      left_join(counts, by = grouping_vars[grouping_vars != "subject"])
+  }
+
+  if (!is.null(conditional_vars)) {
+    summarized_data <- as_LB4L_CD_summary(summarized_data)
   } else {
-    summarized_data <- data %>%
-      group_by_(.dots = grouping_vars) %>%
-      summarise(medianRT = median(final_RT),
-                nObs = n())
+    summarized_data <- as_LB4L_IV_summary(summarized_data)
   }
 
   return(summarized_data)
 }
-
 
 #' Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
 #'
@@ -214,17 +275,19 @@ RT <- function(data, group_level, given = NULL) {
 #' @export
 autoplot.LB4L_IV_summary <- function(data) {
 
-  if ("medianRT" %in% names(data)) {
-    p <- ggplot(data = as.data.frame(data),
-                aes_string(x = "group", y = "medianRT", color = "cond", group = "cond")) +
+  data$cond <- interaction(data$practice, data$OCpractice)
+  if ("median_RT" %in% names(data)) {
+    p <- ggplot(data = data,
+                aes_string(x = "group", y = "median_RT", color = "cond", group = "cond")) +
       geom_point(size=3, shape = 2) +
       ylab("Median First-Press Latency")
 
   } else if ("avg_final_acc" %in% names(data)) {
-    p <- ggplot(data = as.data.frame(data),
-                aes_string(x = "group", y = "avgAcc", color = "cond", group = "cond")) +
+    p <- ggplot(data = data,
+                aes_string(x = "group", y = "avg_final_acc", color = "cond", group = "cond")) +
       geom_point(size=3) +
-      geom_errorbar(aes(ymax = avgAcc + sem, ymin = avgAcc - sem),
+      geom_errorbar(aes(ymax = avg_final_acc + sem_final_acc,
+                        ymin = avg_final_acc - sem_final_acc),
                     width = .025) +
       ylab("Accuracy")
 
@@ -248,26 +311,49 @@ autoplot.LB4L_IV_summary <- function(data) {
 }
 
 #' @describeIn FAM_classes Creates a data frame with the primary class "LB4L"
+#'
+#' @param data An R object that is, or can be coerced to, a data frame.
+#' @param tables A list of named character vectors which give the name of the datasets
+#' holding observations from each experimental phase. The datasets can take any names,
+#' but the names of each item in the list must be one of \code{"study", "study_practice",
+#' "test_practice"} or \code{"final"}.
+#' @param IDvars A Character vector specifying variables that can be used to group
+#' the data (see \code{\link{group_by}}). Defaults to the variables given by any
+#' present grouping.
+#' @param experiment A character vector giving the name of the experiment. Used to name
+#' figures and any prefix any saved Rda/Rds objects.
+#' @param practice_tests A numeric scalar giving the number of practice tests
+#' taken.
 #' @export
-as.LB4L <- function(data, ...) {
-  data <- as.data.frame(data)
+as_LB4L <- function(data, tables = attr(data, "tables"),
+                    IDvars = vapply(groups(data), as.character, character(1L)),
+                    experiment = attr(data, "experiment"),
+                    practice_tests = attr(data, "practice_tests")) {
+  mostattributes(data) <- c(attributes(data),
+                            list(tables = tables, experiment = experiment,
+                                 IDvars = IDvars, practice_tests = practice_tests))
   class(data) <- c("LB4L", class(data))
   return(data)
 }
 
 #' @describeIn FAM_classes Creates a data frame with the primary class "LB4L_IV_summary"
 #' @export
-as.LB4L_IV_summary <- function(data, ...) {
-  data <- as.data.frame(data)
+as_LB4L_IV_summary <- function(data, ...) {
   class(data) <- c("LB4L_IV_summary", class(data))
   return(data)
 }
 
 #' @describeIn FAM_classes Creates a data frame with the primary class "LB4L_CD_summary"
 #' @export
-as.LB4L_CD_summary <- function(data, ...) {
-  data <- as.data.frame(data)
+as_LB4L_CD_summary <- function(data, ...) {
   class(data) <- c("LB4L_CD_summary", class(data))
+  return(data)
+}
+
+#' @describeIn FAM_classes Creates a data frame with the primary class "LB4L_joint_summary"
+#' @export
+as_LB4L_joint_summary <- function(data, ...) {
+  class(data) <- c("LB4L_joint_summary", class(data))
   return(data)
 }
 
@@ -286,6 +372,12 @@ is.LB4L2_IV_summary <- function(x) {
   return("LB4L_IV_summary" %in% class(x)[1])
 }
 
+#'@describeIn FAM_classes Checks if an R object has \code{LB4L_IV_summary} as it's
+#' first value of the \code{class} attribute.
+#' #' @export
+is.LB4L2_CD_summary <- function(x) {
+  return("LB4L_CD_summary" %in% class(x)[1])
+}
 
 #' Summarizing the raw LB4L2 dataset given practice test performance
 #'
