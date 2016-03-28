@@ -297,14 +297,67 @@ autoplot.LB4L_IV_summary <- function(data) {
 
   p <- p +  geom_line(size=1) +
     scale_color_discrete("Practice\nCondition",
-                         breaks = c("C.C","C.S","C.T","S.C","T.C"),
-                         labels = c(C.C = "Baseline", C.S ="Other Cue Study", S.C  = "Restudy",
-                                    C.T = "Other Cue Test", T.C = "Test Same Cue")) +
+                         breaks = c("N.N","N.S","N.T","S.N","T.N"),
+                         labels = c(N.N = "Baseline", N.S ="Other Cue Study", S.N  = "Restudy",
+                                    N.T = "Other Cue Test", T.N = "Test Same Cue")) +
     scale_x_discrete("Group",expand=c(0,.25),
                      limits = c("immediate", "delay"),
                      labels=c("Immediate","Delay")) +
     theme(legend.key.height = unit(2,"line")) +
     ggtitle('Final Test')
+
+  return(p)
+
+}
+
+#' Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
+#'
+#' @param data An LB4L2_IV_summary data frame from the FAM package.
+#' @export
+autoplot.LB4L_CD_summary <- function(data) {
+
+  lookup_table <- c("0" = "Incorect", "1" = "Correct")
+  labels_fun <- labeller(practice1acc = setNames(paste("Practice Test 1", lookup_table), names(lookup_table)),
+                         practice2acc = setNames(paste("Practice Test 2", lookup_table), names(lookup_table)),
+                         final_acc = setNames(paste("Final Test", lookup_table), names(lookup_table)))
+
+  if ("median_RT" %in% names(data)) {
+    data$cond <- interaction(data$practice, data$OCpractice)
+    p <- ggplot(data = data,
+                aes_string(x = "group", y = "median_RT", color = "cond", group = "cond")) +
+      geom_point(size=3, shape = 2) +
+      facet_grid(~final_acc, labeller = labels_fun) +
+      ylab("Median First-Press Latency") +
+      scale_color_discrete("Practice\nCondition",
+                           breaks = c("N.N","N.S","N.T","S.N","T.N"),
+                           labels = c(N.N = "Baseline", N.S ="Other Cue Study", S.N  = "Restudy",
+                                      N.T = "Other Cue Test", T.N = "Test Same Cue"))
+
+  } else if ("avg_final_acc" %in% names(data)) {
+    givens <- grep("practice", names(data), value = TRUE)
+
+
+    p <- ggplot(data = data,
+                aes_string(x = "group", y = "avg_final_acc", color = "sameCue", group = "sameCue")) +
+      geom_point(size=3) +
+      facet_grid(~practice1acc, labeller = labels_fun) +
+      geom_errorbar(aes(ymax = avg_final_acc + sem_final_acc,
+                        ymin = avg_final_acc - sem_final_acc),
+                    width = .025) +
+      scale_color_discrete("Cue Used", breaks = c("no","yes"),
+                           labels = c(no = "Other Cue", yes ="Same Cue")) +
+      ylab("Condtional Accuracy")
+
+  } else {
+    stop("Did not recognize any DV columns in this LB4L_IV_summary object")
+  }
+
+  p <- p +  geom_line(size=1) +
+    scale_x_discrete("Group",expand=c(0,.25),
+                     limits = c("immediate", "delay"),
+                     labels=c("Immediate","Delay")) +
+    theme(legend.key.height = unit(2,"line")) +
+    ggtitle('Final Test Accuracy given Practice Test Accuracy')
 
   return(p)
 
