@@ -13,6 +13,7 @@ manual_scoring <- function(data, prefix) {
       scored <- edit(data_to_score[!has_been_scored, ])
       has_been_scored <- scored$acc %in% c(0,1)
     }
+    return(scored)
   }
 
   clean_path <- file.path("data-raw", paste(prefix, "cleaned.Rdata", sep = "_"))
@@ -24,17 +25,20 @@ manual_scoring <- function(data, prefix) {
     clean_data <- get(f)
     rm(list = f)
     clean_data$subject <- as.integer(clean_data$subject)
+    weak_matches <- as.data.frame(data[!data$acc %in% c(0,1),])
 
-    if (!identical(as.data.frame(data[!data$acc %in% c(0,1), scoring_cols]),
-                   clean_data[, scoring_cols])) {
-      to_score <- anti_join(data, clean_data, by = scoring_cols)
-      clean_data <- rbind(clean_data,
-                      scoring_loop(to_score[, c(scoring_cols,"acc")]))
+    if (!identical(weak_matches[, scoring_cols],  clean_data[, scoring_cols])) {
+      to_score <- anti_join(weak_matches, clean_data, by = scoring_cols)
+      scored <- scoring_loop(to_score[, c(scoring_cols, "acc")])
+      scored <- left_join(cbind(rowid = 1:nrow(weak_matches), weak_matches[,scoring_cols]),
+                          cbind(rowid = 1:(nrow(scored) + nrow(clean_data)), rbind(clean_data,scored)),
+                          by = c("rowid",scoring_cols))
       assign(f, clean_data)
       save(list = f, file = clean_path)
     }
 
   } else {
+    f <- paste(prefix, "cleaned.Rdata", sep = "_")
     clean_data <- scoring_loop(data[!data$acc %in% c(0,1), c(scoring_cols,"acc")])
     assign(f, clean_data)
     save(list = f, file = clean_path)
@@ -70,6 +74,7 @@ stopifnot(all(vapply(list(spFList,tpFList,fFList),
 
 ## Start with study data
 study <- data.frame(do.call(rbind,lapply(sFList, read.csv))) %>%
+  arrange(subject) %>%
   replace_na(list(test = 0)) %>%
   mutate(practice = replace(practice, practice == '', 'N')) %>%
   group_by(subject) %>%
@@ -80,6 +85,7 @@ study <- data.frame(do.call(rbind,lapply(sFList, read.csv))) %>%
 
 # Now study practice data
 sp <- data.frame(do.call(rbind,lapply(spFList, read.csv))) %>%
+  arrange(subject) %>%
   select(subject:target, test, onset) %>%
   mutate(test = ifelse(test == 1, "yes", "no")) %>%
   rename(sameCue = test) %>%
@@ -90,6 +96,7 @@ sp <- data.frame(do.call(rbind,lapply(spFList, read.csv))) %>%
 
 # Now test practice data
 tp <- data.frame(do.call(rbind,lapply(tpFList, read.csv))) %>%
+  arrange(subject) %>%
   mutate(test = ifelse(is.na(test), "no", "yes"),
          RT = firstPress-onset) %>%
   select(-practice, sameCue = test) %>%
@@ -103,6 +110,7 @@ tp <- data.frame(do.call(rbind,lapply(tpFList, read.csv))) %>%
 # Now final test data
 # Join the other-cue practice column from study
 final <- data.frame(do.call(rbind,lapply(fFList, read.csv))) %>%
+  arrange(subject) %>%
   mutate(practice = NULL,
          RT = firstPress - onset) %>%
   group_by(subject, list, cue) %>%
