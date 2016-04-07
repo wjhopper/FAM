@@ -59,11 +59,28 @@ optim_wrapper <- function(parameters, PCR_model_obj, ...) {
 #' @importFrom tidyr gather
 summary.LB4L2_PCR <- function(x, DV = "recalled") {
 
+  x <- lapply(x, function(y){
+    y$practice[is.na(y$practice)] <- "control"
+    return(y)
+  })
+
+
+
+
+  SC_test <- x[["SC_test"]]$recalled[[1]]
+  SC_joint <- mapply(`&`,
+                     list(cor_inc = SC_test[,,1], inc_inc = !SC_test[,,1],
+                          cor_cor = SC_test[,,1], inc_cor = !SC_test[,,1]),
+                     list(!SC_test[,,2], !SC_test[,,2], SC_test[,,2], SC_test[,,2]))
+
+  OC_tp <- x[["OC_test"]]$recalled[[2]]
+  OC_final <- x[["OC_test"]]$recalled[[1]]
+  OC_joint <- mapply(`&`,
+                    list(cor_inc = OC_tp, inc_inc = !OC_tp,
+                         cor_cor = OC_tp, inc_cor = !OC_tp),
+                    list(!OC_final, !OC_final, OC_final, OC_final))
+
   if (DV == "recalled") {
-    fun <- colMeans
-  } else if (DV == "RT"){
-    fun = I
-  }
 
     IVresults <- bind_rows(lapply(x, summary), .id = "condition")
 
@@ -74,25 +91,10 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
     final_test <- filter(IVresults, !(practice == "T" & test == 1)) %>%
       group_by(condition) %>%
       mutate(OCpractice = switch(condition, OC_test = "T", OC_study = "S", "C"))
+    SC_joint <- colMeans(SC_joint)
+    OC_joint <- colMeans(OC_joint)
 
-    x <- lapply(x, function(y){
-                    y$practice[is.na(y$practice)] <- "control"
-                    return(y)
-                   })
-
-    SC_test <- x[["SC_test"]][[DV]][[1]]
-    SC_joint <- fun(mapply(`&`,
-                         list(cor_inc = SC_test[,,1], inc_inc = !SC_test[,,1],
-                              cor_cor = SC_test[,,1], inc_cor = !SC_test[,,1]),
-                         list(!SC_test[,,2], !SC_test[,,2], SC_test[,,2], SC_test[,,2])))
     SC_CD <- SC_joint[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="yes"]))
-
-    OC_tp <- x[["OC_test"]][[DV]][[2]]
-    OC_final <- x[["OC_test"]][[DV]][[1]]
-    OC_joint <- fun(mapply(`&`,
-                                list(cor_inc = OC_tp, inc_inc = !OC_tp,
-                                     cor_cor = OC_tp, inc_cor = !OC_tp),
-                                list(!OC_final, !OC_final, OC_final, OC_final)))
     OC_CD <- OC_joint[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="no"]))
 
     joint_results <- cbind(as.data.frame(SC_joint), as.data.frame(OC_joint)) %>%
@@ -112,5 +114,25 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
 
     return(list(practice= practice_test, final = final_test,
                 conditional = CD_results, joint = joint_results))
+
+  } else {
+
+    final_test <- lapply(x[c("control","OC_study", "SC_study")], function(y) as.vector(y$RT[[1]][,,1])) %>%
+      as.data.frame(.) %>%
+      gather(key = "condition", value = "RT")
+    SC_joint <- apply(x[['SC_test']]$RT[[1]], 3, `[`, SC_joint[,"cor_cor"]) %>%
+      setNames(c("practice","final")) %>%
+      data.frame(sameCue = "no", as.data.frame(.))
+
+
+    OC_joint <- sapply(x[['OC_test']]$RT, `[`, OC_joint[,"cor_cor"]) %>%
+      setNames(c("practice","final")) %>%
+      data.frame(sameCue = "yes", as.data.frame(.))
+
+    joint_results <- bind_rows(SC_joint, OC_joint)
+
+    return(list(final = final_test, joint = joint_results))
+  }
+
 
 }
