@@ -14,14 +14,18 @@ Imports:
     reshape2,
     tidyr,
     whoppeR (>= 0.0.0.9004),
-    PCR (>= 0.1.0.9000)
+    PCR (>= 1.0.2)
 Suggests:
     knitr,
     grid,
     gridExtra,
     pander,
     wesandersen,
-    testthat
+    testthat,
+    optimx,
+    digest,
+    xtable,
+    tidyr
 License: CC0
 LazyData: true
 VignetteBuilder: knitr
