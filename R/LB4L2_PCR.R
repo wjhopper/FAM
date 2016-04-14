@@ -9,7 +9,7 @@
 #' @export
 #'
 #' @examples
-#' model_params <- initPCRparams(params = list(ER=.6, LR=.2, FR=.1, TR=.15, TV = .05),
+#' model_params <- initPCR(params = list(ER=.6, LR=.2, FR=.1, TR=.15, TV = .05),
 #'                    distribution = "beta", nItems = 20, nSims = 1000,
 #'                    nFeatures = 100, time = 10)
 #' results <- LB4L2_PCR(model_params)
@@ -59,14 +59,22 @@ optim_wrapper <- function(parameters, PCR_model_obj, ...) {
 #' @importFrom tidyr gather
 summary.LB4L2_PCR <- function(x, DV = "recalled") {
 
-  x <- lapply(x, function(y){
-    y$practice[is.na(y$practice)] <- "control"
-    return(y)
-  })
+  IVresults <- bind_rows(lapply(x, summary), .id = "condition") %>%
+    mutate(practice = toupper(substr(practice,1,1)))
 
+  practice_test <- filter(IVresults, practice == "T", test == 1) %>%
+    mutate(sameCue = ifelse(grepl("OC", condition), "no", "yes"))
 
+  final_test <- anti_join(IVresults,practice_test,
+                          by = c("condition","practice","test")) %>%
+    group_by(condition) %>%
+    mutate(OCpractice = switch(first(condition),
+                               OC_test = "T",
+                               OC_study = "S",
+                               "N")) %>%
+    ungroup()
 
-
+  # Subset all the data from items tested twice.
   SC_test <- x[["SC_test"]]$recalled[[1]]
   SC_joint <- mapply(`&`,
                      list(cor_inc = SC_test[,,1], inc_inc = !SC_test[,,1],
@@ -80,59 +88,37 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
                          cor_cor = OC_tp, inc_cor = !OC_tp),
                     list(!OC_final, !OC_final, OC_final, OC_final))
 
-  if (DV == "recalled") {
+  ## Joint Accuracy Results
+  SC_joint_acc <- colMeans(SC_joint)
+  OC_joint_acc <- colMeans(OC_joint)
 
-    IVresults <- bind_rows(lapply(x, summary), .id = "condition")
+  ## Joint RT results
+  raw_joint_RT <- list(OC_joint_RT = sapply(x[['OC_test']]$RT, `[`, OC_joint[,"cor_cor"]),
+                       SC_joint_RT = apply(x[['SC_test']]$RT[[1]], 3, `[`, SC_joint[,"cor_cor"])) %>%
+    lapply(`dimnames<-`, (list(NULL, c("practice", "final")))) %>%
+    mutate(tbl_df(data.frame(sameCue = c("no","yes"), practice = 1, final =1)),
+           raw_joint_RTs = .)
 
-    practice_test <- filter(IVresults, practice == "T", test == 1) %>%
-      mutate(sameCue = ifelse(grepl("OC", condition), "no", "yes")) %>%
-      select(sameCue, practice, accuracy, RT)
+  joint_results <- cbind(as.data.frame(SC_joint_acc), as.data.frame(OC_joint_acc)) %>%
+    mutate(condition = rownames(.)) %>%
+    separate(condition, c("practice", "final")) %>%
+    mutate(practice = ifelse(practice == "cor", 1, 0),
+           final = ifelse(final == "cor", 1, 0)) %>%
+    gather(sameCue, probability, SC_joint_acc, OC_joint_acc) %>%
+    mutate(sameCue = ifelse(sameCue == "SC_joint_acc", "yes", "no")) %>%
+    left_join(y = raw_joint_RT, by = c("sameCue", "practice", "final")) %>%
+    tbl_df()
 
-    final_test <- filter(IVresults, !(practice == "T" & test == 1)) %>%
-      group_by(condition) %>%
-      mutate(OCpractice = switch(condition, OC_test = "T", OC_study = "S", "C"))
-    SC_joint <- colMeans(SC_joint)
-    OC_joint <- colMeans(OC_joint)
+  # Conditional Accuracy
+  SC_CD <- SC_joint_acc[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="yes"]))
+  OC_CD <- OC_joint_acc[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="no"]))
 
-    SC_CD <- SC_joint[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="yes"]))
-    OC_CD <- OC_joint[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="no"]))
+  CD_results <- cbind(as.data.frame(SC_CD), as.data.frame(OC_CD)) %>%
+    mutate(practice = gsub("_cor", "", rownames(.))) %>%
+    gather(sameCue, accuracy, SC_CD, OC_CD) %>%
+    mutate(sameCue = ifelse(sameCue == "SC_CD", "yes", "no")) %>%
+    mutate(sameCue, practice, accuracy)
 
-    joint_results <- cbind(as.data.frame(SC_joint), as.data.frame(OC_joint)) %>%
-      mutate(condition = rownames(.)) %>%
-      separate(condition, c("practice", "final")) %>%
-      mutate(practice = ifelse(practice == "cor", 1, 0),
-             final = ifelse(final == "cor", 1, 0)) %>%
-      gather(sameCue, probability, SC_joint, OC_joint) %>%
-      mutate(sameCue = ifelse(sameCue == "SC_joint", "yes", "no")) %>%
-      mutate(sameCue, practice, final, probability)
-
-    CD_results <- cbind(as.data.frame(SC_CD), as.data.frame(OC_CD)) %>%
-      mutate(practice = gsub("_cor", "", rownames(.))) %>%
-      gather(sameCue, accuracy, SC_CD, OC_CD) %>%
-      mutate(sameCue = ifelse(sameCue == "SC_CD", "yes", "no")) %>%
-      mutate(sameCue, practice, accuracy)
-
-    return(list(practice= practice_test, final = final_test,
-                conditional = CD_results, joint = joint_results))
-
-  } else {
-
-    final_test <- lapply(x[c("control","OC_study", "SC_study")], function(y) as.vector(y$RT[[1]][,,1])) %>%
-      as.data.frame(.) %>%
-      gather(key = "condition", value = "RT")
-    SC_joint <- apply(x[['SC_test']]$RT[[1]], 3, `[`, SC_joint[,"cor_cor"]) %>%
-      setNames(c("practice","final")) %>%
-      data.frame(sameCue = "no", as.data.frame(.))
-
-
-    OC_joint <- sapply(x[['OC_test']]$RT, `[`, OC_joint[,"cor_cor"]) %>%
-      setNames(c("practice","final")) %>%
-      data.frame(sameCue = "yes", as.data.frame(.))
-
-    joint_results <- bind_rows(SC_joint, OC_joint)
-
-    return(list(final = final_test, joint = joint_results))
-  }
-
-
+  return(list(practice= practice_test, final = final_test,
+              conditional = CD_results, joint = joint_results))
 }
