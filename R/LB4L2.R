@@ -5,13 +5,7 @@
 #' This is a method for the S3 generic function \code{\link{summary}} which reports
 #' either the subject-level or condition-levels means for each experimental condition.
 #'
-#' @param data LB4L or LB4L2 data set from the FAM package.
-#' @param DV A character vector of length one, used for determing the which dependent
-#' variable should be summarised in each experimental condition. If the value is
-#' \code{"accuracy"} (the default) then the percent of items correctly recalled
-#' is returned for each condition. If the value is \code{"RT"}, then the first-press
-#' latency in each experimental condition is returned, conditioned on accuracy of
-#' the response.
+#' @param data An LB4L data set from the FAM package.
 #' @param level A character vector of length one, used for determing the level
 #' of the summary. If the value is \code{"subject"} (the default) then the means
 #' for each subject are returned. If the value is \code{"group"} then the means
@@ -23,214 +17,57 @@
 #' used as grouping variables for calculating conditional final test averages. A logical
 #' vector of length one (i.e., \code{TRUE} or \code{FALSE} can be used to indicate
 #' all practice tests should be used, or no practice test should be used.
-#' @param given_final A logical vector of length one, indicating whether or not
-#' group observations for specific targets according to the accuracy outcome on the final test.
-#' If this argument is set to \code{TRUE}, given_practice is set to \code{TRUE},
-#' and the DV is set to \code{"accuracy"}, then the joint distribution of practice and final
-#' test outcomes is returned
+#' @param conditional A logical scalar indicating whether or not analysis should
+#' condition on practice test performance. If \code{FALSE}, and given_practice is
+#' not \code{FALSE}, a joint analysis of practice and final test outcomes is performed.
+#' @param given_data The dataset to use for conditional or joint analysis. If not
+#' supplied, the datset specified in the "test_practice" field of the "tables" list
+#' attribute of the dataset given as the \code{data} argument.
 #'
 #' @note Trials where no keys were pressed by the participant are excluded from
 #' the RT summary.
 #'
-#' @importFrom Hmisc wtd.var
+#' @importFrom magrittr %>% %<>%
+#' @importFrom tidyr expand_ replace_na
 #' @export
-summary.LB4L <- function(data, DV = "accuracy", level = "subject",
-                         given_practice = FALSE, given_final = (DV == "RT")) {
+summary.LB4L <- function(data, level = c("subject", "group", "raw"),
+                         given_practice = FALSE,
+                         conditional = FALSE,
+                         given_data = NULL) {
 
-  level <- tolower(level)
-  if ( length(level) > 1 || !(level %in% c("subject", "group", "raw")) ) {
-    stop('level argument must be either "subject", "group", or "raw"')
+  level <- match.arg(tolower(level), c("subject", "group", "raw"))
+
+  if (!all(c("acc","RT") %in% names(data))) {
+    stop(paste("Variables 'acc' and 'RT' not found in this data set"))
   }
 
-  if ( length(DV) > 1 || !(DV %in% c("RT", "accuracy"))) {
-    stop('DV argument must be either "RT" or "accuracy"')
+  if (!is.numeric(given_practice) && !is.logical(given_practice)) {
+    stop("'given_practice' must be logical scalars or numeric vectors")
   }
 
-  if (DV == "RT") {
-    if (!("RT" %in% names(data))) {
-      stop(paste(DV, "variable not found in this data set"))
-    }
-    DVfun <- RT
-
-  } else if (DV == "accuracy") {
-    if (!("acc" %in% names(data))) {
-      stop(paste(DV, "variable not found in this data set"))
-    }
-    DVfun <- accuracy
-  }
-
-  if (!all(is.numeric(given_practice) || is.logical(given_practice),
-           is.numeric(given_final) || is.logical(given_final))) {
-    stop("'given_practice' and 'given_final' arguments must be logical scalars or numeric vectors")
+  if (conditional && !any(given_practice > 0)) {
+    stop('"given_practice" can not be FALSE if "conditional" is TRUE')
   }
 
   data <- rename(data, final_acc = acc, final_RT = RT)
 
-  if (!any(given_practice > 0) && given_final) {
-    data <- DVfun(data, level = level,
-                  conditional_vars = "final_acc")
-
-  } else if (is.numeric(given_practice) && all(given_practice > 0)) {
-    rounds <- 1:attr(data,"practice_tests")
-    given_data <- get(attr(data,"tables")$test_practice)
-
-    if (!setequal(given_practice, rounds)) {
-      given_data <- filter(given_data, round %in% given_practice)
+  if (any(given_practice > 0)) {
+    if (is.null(given_data)) {
+      given_data <- get(attr(data,"tables")$test_practice)
     }
-
-    if (given_final) {
-      conditional_vars <- c(paste0("practice", given_practice, "acc"), "final_acc")
-    } else {
-      conditional_vars <- paste0("practice", given_practice, "acc")
-    }
-
-    data <- DVfun(data, level = level,
-                  given_data = given_data,
-                  conditional_vars = conditional_vars)
-
-  } else if (identical(given_practice, TRUE)) {
-    given_practice <- 1:attr(data,"practice_tests")
-    given_data <- get(attr(data,"tables")$test_practice)
-
-    if (given_final) {
-      conditional_vars <- c(paste0("practice", given_practice,"acc"), "final_acc")
-    } else {
-      conditional_vars <- paste0("practice", given_practice,"acc")
-    }
-
-    data <- DVfun(data, level = level,
-                  given_data = given_data,
-                  conditional_vars = conditional_vars)
-
-  } else {
-    data <- DVfun(data, level = level)
-  }
-
-  return(data)
-}
-
-# Internal function for de-normalizing the test practice data to make a column
-# for each round of test practice
-#' @importFrom tidyr spread_
-reshaping <- function(given_data, conditional_vars, DV) {
-
-  size <- unique(given_data$round)
-  spread_names <- as.character(size)
-  prefixed_names <- paste0("practice", spread_names, DV)
-
-  if (length(size) == 1) {
-    given_data <- rename_(given_data, .dots = setNames(DV, prefixed_names))
-
-  } else if (length(size) > 1) {
-    spread_names <- as.character(unique(given_data$round))
-    prefixed_names <- paste0("practice", spread_names, DV)
-    given_data <- given_data %>%
-      select_("subject:sameCue", "round", .dots = DV) %>%
-      spread_("round", DV) %>%
-      rename_(.dots=setNames(sapply(spread_names,as.name),
-                             prefixed_names))
-  }
-
-  return(given_data)
-}
-
-
-# Internal funcion for summarizing accuracy data from LB4L experiments
-#' @importFrom tidyr expand_ replace_na
-accuracy <- function(data, level, given_data = NULL, conditional_vars = NULL) {
-
-  if (any(grepl("practice", conditional_vars))) {
-    data <- ungroup(data) %>%
-      select(subject:target, final_acc) %>%
-      left_join(x = reshaping(given_data, conditional_vars, DV = "acc"),
-                y = ., by = c("subject", "group", "list", "target")) %>%
-      select(subject:list, pracCue = cue.x, finalCue = cue.y,
-             target, sameCue, starts_with("practice"), final_acc)
-  }
-
-  if (level == "raw") {
-    return(data)
-  }
-
-  unconditional_vars <- vapply(groups(data), as.character, character(1L))
-  data <- group_by_(data, .dots = conditional_vars, add = TRUE)
-
-  if (any(grepl("final", conditional_vars))) {
-
-    fill_vars <- c(unconditional_vars[unconditional_vars != "group"],
-                   conditional_vars)
-    possible_n <- data %>%
-      group_by_(.dots = unconditional_vars) %>%
-      summarise(cell_max = n())
-
-    summarized_data <- data %>%
-      summarise(freq = n()) %>%
-      left_join(possible_n) %>%
-      mutate(probability = freq/cell_max) %>%
-      select(-freq) %>%
-      left_join(x = expand_(ungroup(.), fill_vars), y = .) %>%
-      replace_na(list(probability = 0)) %>%
-      group_by_(.dots = unconditional_vars[unconditional_vars != "group"]) %>%
-      mutate_each(funs = funs(replace(., is.na(.), first(.[!is.na(.)]))),
-                  group, cell_max)
-
-    if (level == "group") {
-      # grouping_vars <- vapply(groups(data), as.character, character(1L))
-      possible_n <- distinct(select(ungroup(possible_n), -subject))
-      summarized_data <- summarized_data %>%
-        group_by_(.dots = c(unconditional_vars[unconditional_vars != "subject"],
-                            conditional_vars)) %>%
-        left_join(possible_n) %>%
-        summarise(probability = mean(probability))
-    }
-
-    summarized_data <- as_LB4L_joint_summary(summarized_data)
-
-  } else {
-    summarized_data <- data %>%
-      summarise(avg_final_acc = mean(final_acc),
-                nObs = n())
-
-    if (level == "group") {
-      grouping_vars <- vapply(groups(data), as.character, character(1L))
-      summarized_data <- summarized_data %>%
-        group_by_(.dots = grouping_vars[grouping_vars != "subject"]) %>%
-        summarise(sd_final_acc = sd(avg_final_acc),
-                  w_sd_final_acc = sqrt(wtd.var(avg_final_acc, nObs)),
-                  w_avg_final_acc = weighted.mean(avg_final_acc, nObs),
-                  avg_final_acc = mean(avg_final_acc),
-                  nObs = sum(nObs),
-                  N = length(unique(subject))) %>%
-        mutate(sem_final_acc = sd_final_acc/sqrt(N)) %>%
-        select_(.dots = c(grouping_vars[grouping_vars != "subject"],
-                          "avg_final_acc", "sd_final_acc", "sem_final_acc",
-                          "nObs", "N", "w_avg_final_acc", "w_sd_final_acc"))
-    }
-
-    if (any(grepl("practice[0-9]+", conditional_vars))) {
-      summarized_data <- as_LB4L_CD_summary(summarized_data)
-    } else {
-      summarized_data <- as_LB4L_IV_summary(summarized_data)
+    if (is.numeric(given_practice)) {
+      rounds <- 1:attr(data,"practice_tests")
+      if (!setequal(given_practice, rounds)) {
+        given_data <- filter(given_data, round %in% given_practice)
+      }
     }
   }
 
-  return(summarized_data)
-}
-
-
-# Internal method for summarizing RT data from LB4L experiments
-RT <-function(data, level, given_data = NULL, conditional_vars = NULL) {
-
-  if (!is.null(given_data) && any(grepl("practice*", conditional_vars))) {
-    given_data <- given_data %>% filter(is.finite(RT))
+  if (!is.null(given_data)) {
     data <- ungroup(data) %>%
       select(subject:target, final_acc, final_RT) %>%
-      left_join(x = reshaping(given_data, conditional_vars, DV = "acc"),
-               y = .,
-               by = c("subject", "group", "list", "target")) %>%
-      left_join(x = reshaping(given_data, conditional_vars, DV = "RT"),
-                y = .,
-                by = c("subject", "group", "list", "target", "sameCue")) %>%
+      left_join(x = reshaping(given_data),
+                y = ., by = c("subject", "group", "list", "target")) %>%
       select(subject:list, pracCue = cue.x, finalCue = cue.y,
              target, sameCue, starts_with("practice"), final_acc, final_RT)
   }
@@ -239,34 +76,84 @@ RT <-function(data, level, given_data = NULL, conditional_vars = NULL) {
     return(data)
   }
 
-  grouping_vars <- c(vapply(groups(data), as.character, character(1L)), conditional_vars)
-  unconditional_vars <- vapply(groups(data), as.character, character(1L))
-  data <- ungroup(data) %>%
-    filter( !(Reduce('|', lapply(data[,grepl("RT", names(data))], is.na))) ) %>%
-    group_by_(.dots = grouping_vars)
-
-  summarized_data <- data %>%
-    summarise_each(~median, contains("RT")) %>%
-    left_join(summarise(data, nObs = n()))
-
-  if (level == "group") {
-    counts <- summarized_data %>%
-      group_by_(.dots = grouping_vars[grouping_vars != "subject"]) %>%
-      summarise(nObs = sum(nObs),
-                N = length(unique(subject)))
-    summarized_data <- summarized_data %>%
-      group_by_(.dots = grouping_vars[grouping_vars != "subject"]) %>%
-      summarise_each(funs = funs('median_RT' = median, mad(., constant = 1)), contains("RT")) %>%
-      left_join(counts, by = grouping_vars[grouping_vars != "subject"])
+  orig_groups <- sapply(groups(data), as.character)
+  new_groups <- grep("acc$", names(data), value = TRUE)
+  all_groups <- c(orig_groups, new_groups)
+  fill_vars <- grep("\\w*practice$|group", all_groups, value=TRUE, invert=TRUE)
+  if (conditional) {
+    n_grouping <- all_groups[!grepl("final", all_groups)]
+  } else {
+    n_grouping <- c(orig_groups)
   }
 
-  if (!is.null(conditional_vars)) {
-    summarized_data <- as_LB4L_CD_summary(summarized_data)
+  possible_n <- summarise(group_by_(data, .dots = n_grouping),
+                          cell_max = n())
+  fill_frame <- do.call(expand.grid, c(lapply(data[,fill_vars],  unique),
+                                       list(stringsAsFactors = FALSE))) %>%
+    left_join(distinct(select(ungroup(possible_n),subject,group)), by="subject") %>%
+    left_join(possible_n, by = names(.)[names(.) %in% names(possible_n)])
+
+  summarized_data <- data %>%
+    group_by_(.dots = new_groups, add = TRUE) %>%
+    summarise(freq = n(),
+              RT = median(final_RT, na.rm = TRUE),
+              nRT = sum(!is.na(final_RT))) %>%
+    right_join(y = fill_frame, by = intersect(names(.), names(fill_frame))) %>%
+    ungroup() %>%
+    mutate(freq = ifelse(is.na(freq) & !is.na(cell_max), 0, freq),
+           probability = ifelse(is.na(freq), NA_real_, freq/cell_max))
+
+  if (level == "group") {
+    summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"])
+    N <- summarise(summarized_data,
+                   nObs = sum(freq, na.rm=TRUE),
+                   nRT = sum(nRT, na.rm=TRUE),
+                   N = n())
+    summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"]) %>%
+      summarise_each(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)),
+                     probability, RT) %>%
+      left_join(N, by = intersect(names(.), names(N))) %>%
+      mutate(sem_acc = sqrt(probability_sd)/sqrt(N),
+             sem_RT = sqrt(RT_sd)/sqrt(N))
+  }
+
+  conditions <- sum(grepl("practice[0-9]+", names(summarized_data)))
+  if (conditions >= 1) {
+    summarized_data <- as_LB4L_CD_summary(ungroup(summarized_data))
   } else {
-    summarized_data <- as_LB4L_IV_summary(summarized_data)
+    summarized_data <- as_LB4L_IV_summary(ungroup(summarized_data))
   }
 
   return(summarized_data)
+}
+
+
+# Internal function for de-normalizing the test practice data to make a column
+# for each round of test practice
+#' @importFrom tidyr spread_
+reshaping <- function(long_data) {
+
+  long_data <- select(long_data,subject:sameCue, round:acc)
+  spread_names <- unique(long_data$round)
+
+  if (length(spread_names) == 1) {
+    oldnames <- grep("acc|RT", names(long_data),value = TRUE)
+    newnames <- setNames(sapply(oldnames, as.name),
+                         paste0("practice", spread_names, oldnames))
+    wide_data <- rename_(long_data, .dots = newnames)
+
+  } else if (length(spread_names) > 1) {
+
+    acc <- select(long_data, -RT) %>%
+      spread(round, acc) %>%
+      rename_(.dots=setNames(sapply(spread_names, as.name), paste0("practice", spread_names,"acc")))
+    RT <- select(long_data, -acc) %>%
+      spread(round, RT) %>%
+      rename_(.dots=setNames(sapply(spread_names, as.name), paste0("practice", spread_names,"RT")))
+    wide_data <- full_join(acc, RT, by=c("subject","group","list","cue","target","sameCue"))
+  }
+
+  return(wide_data)
 }
 
 #' Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
