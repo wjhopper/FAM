@@ -45,12 +45,13 @@ identical(CD_raw, joint_raw)
 joint <- summary(LB4L2_final, level = "group", given_practice = TRUE)
 joint_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
 joint_2 <- summary(LB4L2_final, level = "group", given_practice = 2)
-
 ```
-
 
 ## Accuracy and RT by Experimental Condition
 ```{r IV, fig.align='center', fig.width = 9}
+IV <- summary(LB4L2_final, level = "group")
+autoplot(IV, DV = "RT")
+autoplot(IV, DV = "accuracy")
 ```
 
 
@@ -59,7 +60,7 @@ joint_2 <- summary(LB4L2_final, level = "group", given_practice = 2)
 ```
 
 ## Joint Accuracy and RT
-```{r joint, fig.align='center', warning=FALSE, fig.width = 9}
+```{r joint, fig.align='center', warning=FALSE, fig.width = 9, eval = FALSE}
 joint_acc_prac1 <- summary(LB4L2_final, level = "group", given_practice = 1)
 joint_acc_prac1$cell = interaction(joint_acc_prac1$practice1acc, joint_acc_prac1$final_acc)
 lookup_table <- c("1.1" ="+ / +", "1.0"  =  "+ / -", "0.1"  = "- / +", "0.0" = "- / -")
