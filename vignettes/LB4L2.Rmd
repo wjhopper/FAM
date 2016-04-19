@@ -30,55 +30,37 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 ```
 
 ```{r tests, include=FALSE, eval=FALSE}
-## accuracy as IV 
-IV_acc <- summary(LB4L2_final, level = "group")
-IV_acc_sub <- summary(LB4L2_final, level = "subject")
-CD_acc <- summary(LB4L2_final, level = "group", given_practice = TRUE)
-raw_CD_acc <- summary(LB4L2_final, level = "raw", given_practice = TRUE)
-raw_joint_acc <- summary(LB4L2_final, level = "raw", given_practice = TRUE, given_final = TRUE)
-identical(summary(LB4L2_final, level = "group", given_practice = 1:2), CD_acc)
-CD_acc_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
-CD_acc_2 <- summary(LB4L2_final, level = "group", given_practice = 2)
-joint_acc <- summary(LB4L2_final, level = "group", given_practice = TRUE, given_final = TRUE)
-joint_acc_1 <- summary(LB4L2_final, level = "group", given_practice = 1, given_final = TRUE)
-joint_acc_2 <- summary(LB4L2_final, level = "group", given_practice = 2, given_final = TRUE)
+IV <- summary(LB4L2_final, level = "group")
+IV_sub <- summary(LB4L2_final, level = "subject")
 
-# RT as DV
-IV_RT <- summary(LB4L2_final, level= "group", DV = "RT", given_final = FALSE)
-IV_RT_sub <- summary(LB4L2_final, level= "subject", DV = "RT", given_final = FALSE)
-CD_RT <- summary(LB4L2_final, level = "group", DV = "RT")
-CD_RT_sub <- summary(LB4L2_final, level = "subject", DV = "RT")
-CD_RT_prac <- summary(LB4L2_final, level = "group", DV = "RT", given_practice = TRUE)
-identical( summary(LB4L2_final, level = "group", DV = "RT", given_practice = 1:2), CD_RT_prac)
-CD_RT_prac1 <- summary(LB4L2_final, level = "group", DV = "RT", given_practice = 1)
-CD_RT_prac2 <- summary(LB4L2_final, level = "group", DV = "RT", given_practice = 2)
+CD <- summary(LB4L2_final, level = "group", given_practice = TRUE, conditional = TRUE) 
+identical(summary(LB4L2_final, level = "group", given_practice = 1:2, conditional = TRUE), CD)
+CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1, conditional = TRUE)
+CD_2 <- summary(LB4L2_final, level = "group", given_practice = 2, conditional = TRUE)
+
+CD_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE, conditional = TRUE)
+joint_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE)
+identical(CD_raw, joint_raw)
+
+joint <- summary(LB4L2_final, level = "group", given_practice = TRUE)
+joint_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
+joint_2 <- summary(LB4L2_final, level = "group", given_practice = 2)
+
 ```
 
 
 ## Accuracy and RT by Experimental Condition
 ```{r IV, fig.align='center', fig.width = 9}
-IV_acc <- summary(LB4L2_final, level = "group")
-autoplot(IV_acc) + 
-  theme_larger(2)
-IV_RT <- summary(LB4L2_final, level= "group", DV = "RT", given_final = FALSE)
-autoplot(IV_RT) + 
-  theme_larger(2)
 ```
 
 
 ## Conditional Accuracy and RT
 ```{r conditionals, fig.align='center', fig.width = 9}
-CD_acc <- summary(LB4L2_final, level = "group", given_practice = 1)
-autoplot(CD_acc) + 
-  theme_larger(2)
-CD_final_RT <- summary(LB4L2_final, level= "group", DV = "RT")
-autoplot(CD_final_RT) + 
-  theme_larger(2)
 ```
 
 ## Joint Accuracy and RT
 ```{r joint, fig.align='center', warning=FALSE, fig.width = 9}
-joint_acc_prac1 <- summary(LB4L2_final, level = "group", given_practice = 1, given_final = TRUE)
+joint_acc_prac1 <- summary(LB4L2_final, level = "group", given_practice = 1)
 joint_acc_prac1$cell = interaction(joint_acc_prac1$practice1acc, joint_acc_prac1$final_acc)
 lookup_table <- c("1.1" ="+ / +", "1.0"  =  "+ / -", "0.1"  = "- / +", "0.0" = "- / -")
 
