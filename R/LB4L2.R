@@ -159,42 +159,60 @@ reshaping <- function(long_data) {
 #' Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
 #'
 #' @param data An LB4L2_IV_summary data frame from the FAM package.
+#' @param DV A character vector specifying which DV to plot, \code{"accuracy"} or
+#' \code{"RT"}
+#' @importFrom lazyeval interp
 #' @export
-autoplot.LB4L_IV_summary <- function(data) {
+autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
 
   data$cond <- interaction(data$practice, data$OCpractice)
-  if ("median_RT" %in% names(data)) {
-    p <- ggplot(data = data,
-                aes_string(x = "group", y = "median_RT", color = "cond", group = "cond")) +
-      geom_point(size=3, shape = 2) +
-      ylab("Median First-Press Latency")
 
-  } else if ("avg_final_acc" %in% names(data)) {
-    p <- ggplot(data = data,
-                aes_string(x = "group", y = "avg_final_acc", color = "cond", group = "cond")) +
-      geom_point(size=3) +
-      geom_errorbar(aes(ymax = avg_final_acc + sem_final_acc,
-                        ymin = avg_final_acc - sem_final_acc),
-                    width = .025) +
-      ylab("Accuracy")
-
-  } else {
-    stop("Did not recognize any DV columns in this LB4L_IV_summary object")
+  if (grepl("rt", DV, ignore.case = TRUE)) {
+    DV <- "RT"
+    y_label <- ylab("Mean of Median First-Press Latency")
+  } else if (grepl("acc", DV, ignore.case = TRUE)) {
+    data <- filter(data, final_acc == 1)
+    DV <- "probability"
+    y_label <- ylab("Mean Accuracy")
   }
 
-  p <- p +  geom_line(size=1) +
+  y_val <- grep(paste0('^', DV, '(?!_sd)'), names(data),
+                value = TRUE, perl = TRUE, ignore.case = TRUE)
+
+  p <- ggplot(data = data, aes_string(x = "group", y = y_val,
+                                      color = "cond", group = "cond")) +
+    geom_point(size=2) +
+    geom_line(size=1) +
     scale_color_discrete("Practice\nCondition",
                          breaks = c("N.N","N.S","N.T","S.N","T.N"),
-                         labels = c(N.N = "Baseline", N.S ="Other Cue Study", S.N  = "Restudy",
+                         labels = c(N.N = "Baseline", N.S ="Other Cue Study", S.N = "Restudy",
                                     N.T = "Other Cue Test", T.N = "Test Same Cue")) +
     scale_x_discrete("Group",expand=c(0,.25),
                      limits = c("immediate", "delay"),
                      labels=c("Immediate","Delay")) +
     theme(legend.key.height = unit(2,"line")) +
+    y_label +
     ggtitle('Final Test')
 
-  return(p)
+  if (!("subject" %in% names(data))) {
+    table <- c("probability" = "acc", "RT" = "RT")
+    err_val <- grep(paste0('^sem_', table[DV]), names(data),
+                      value = TRUE, perl = TRUE, ignore.case = TRUE)
+    vals <- list(x = as.name(y_val), y = as.name(err_val))
+    data %<>% mutate_(upper = interp(~ x + y, .values = vals),
+                      lower = interp(~ x - y, .values = vals))
+    p <- p + geom_errorbar(aes(ymax = upper, ymin = lower),
+                           data = data, width = .025)
+  }
 
+  if (length(unique(data$final_acc) > 2)) {
+    lookup_table <- c(`0` = "Incorrect", `1` = "Correct")
+    p <- p + facet_grid(~final_acc,
+                        labeller = labeller(final_acc = lookup_table))
+  }
+
+
+  return(p)
 }
 
 #' Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
