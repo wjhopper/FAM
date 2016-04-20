@@ -93,17 +93,28 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
     left_join(distinct(select(ungroup(possible_n),subject,group)), by="subject") %>%
     left_join(possible_n, by = names(.)[names(.) %in% names(possible_n)])
 
+  prac_RTcols <- grep("practice[0-9]+RT", names(data), value = TRUE)
+  prac_RT_funs <- lapply(prac_RTcols, function(x) {
+    as.formula(paste0("~median(", x, ", na.rm = TRUE)"))
+    }) %>%
+    setNames(prac_RTcols)
+
   summarized_data <- data %>%
     group_by_(.dots = new_groups, add = TRUE) %>%
-    summarise(freq = n(),
-              RT = median(final_RT, na.rm = TRUE),
-              nRT = sum(!is.na(final_RT))) %>%
+    summarise_(freq = ~n(),
+              RT = ~median(final_RT, na.rm = TRUE),
+              nRT = ~sum(!is.na(final_RT)),
+              .dots = prac_RT_funs) %>%
     right_join(y = fill_frame, by = intersect(names(.), names(fill_frame))) %>%
     ungroup() %>%
     mutate(freq = ifelse(is.na(freq) & !is.na(cell_max), 0, freq),
            probability = ifelse(is.na(freq), NA_real_, freq/cell_max))
 
   if (level == "group") {
+    # prac_RT_funs <- lapply(prac_RTcols, function(x) {
+    #   as.formula(paste0("~mean(", x, ")"))
+    # }) %>%
+    #   setNames(prac_RTcols)
     summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"])
     N <- summarise(summarized_data,
                    nObs = sum(freq, na.rm=TRUE),
