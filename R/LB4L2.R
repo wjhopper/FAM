@@ -270,6 +270,7 @@ autoplot.LB4L_CD_summary <- function(data, DV = "accuracy", ...) {
 }
 
 #'
+#' @importFrom ggplot2 labeller
 labels_fun <- labeller(practice1acc = setNames(paste("Practice Test", c("Incorrect","Correct")),
                                                c("0","1")),
                        practice2acc = setNames(paste("Practice Test 2",c("Incorrect","Correct")),
