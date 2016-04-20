@@ -49,12 +49,6 @@ LB4L2_PCR <- function(PCR_model_obj) {
 }
 
 #' @export
-optim_wrapper <- function(parameters, PCR_model_obj, ...) {
-  PCR_model_obj <- updatePCRparams(as.list(parameters))
-  return(LB4L2_PCR(PCR_model_obj, ...))
-}
-
-#' @export
 #' @importFrom tidyr separate
 #' @importFrom tidyr gather
 summary.LB4L2_PCR <- function(x, DV = "recalled") {
@@ -122,3 +116,128 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
   return(list(practice= practice_test, final = final_test,
               conditional = CD_results, joint = joint_results))
 }
+
+
+#' fitPCR
+#'
+#' @param PCRparams_obj
+#' @param objective_fcn E.g., LB4L2_PCR
+#' @param error_fcn
+#' @param ...
+#'
+#' @return
+#'
+#' @import PCR
+#' @export
+#'
+#' @examples
+fitPCR <- function(parameters = NULL, PCRparams_obj, objective_fcn, error_fcn, ...) {
+  if (!is.null(parameters)) {
+    if (!is.vector(parameters)) {
+      stop('"parameters" argument must be a named list with scalar numeric elements')
+    } else if (all(vapply(parameters, Negate(is.null), logical(1))) && all(vapply(parameters, is.finite, logical(1)))) {
+      PCRparams_obj <- updatePCRparams(as.list(parameters))
+    }
+  }
+
+  raw <- objective_fcn(PCRparams_obj)
+  results <- summary(raw)
+  error <- error_fcn(results, ...)
+  return(error)
+
+}
+
+#' LB4L2_PCR Error Function
+#'
+#' @param results
+#' @param IV_obs
+#' @param joint_obs
+#' @param type
+#'
+#' @return
+#'
+#' @import PCR
+#' @importFrom tidyr gather spread unnest
+#' @importFrom ks kde
+#' @importFrom whoppeR binomialLL multinomialLL
+#' @export
+#'
+#' @examples
+LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, type = c("RT","accuracy","all")) {
+
+  type <- match.arg(type,  c("RT","accuracy","all"))
+  error <- 0
+
+  IV_pred <- results$final %>%
+    filter(practice != "T", OCpractice != "T", accuracy == 1) %>%
+    select(practice, OCpractice, accuracy, acc = proportion, RT = medianRT, rawRTs = rawRTs) %>%
+    semi_join(IV_obs, by = c("practice", "OCpractice", "accuracy"="final_acc")) %>%
+    rowwise() %>%
+    mutate(rawRTs = list(round(rawRTs,1)))
+
+  IV <- bind_rows(mutate(IV_obs, type = "obs", final_acc = NULL),
+                  mutate(IV_pred, type = "pred", accuracy = NULL))
+
+  if (type %in% c("all","accuracy")) {
+    binom_lik <- select(IV,group:acc,type) %>%
+      spread(type, acc) %>%
+      with(binomialLL(obs = obs, pred = pred, N = 20))
+    error <- error + binom_lik
+  }
+
+  if (type %in% c("all","RT")) {
+    IV_density<- select(filter(IV, type == "pred"),-acc,-RT,-type) %>%
+      rowwise() %>%
+      mutate(KD = list(density(rawRTs, bw = 1, from = .1, to = 8, n = 80)[c("x","y")]))
+    IV_density$KD <- lapply(IV_density$KD, function(k)  {
+      data.frame(RT=round(k$x,1), density= k$y/sum(k$y))
+      })
+    IV_density <- select(IV_density, -rawRTs) %>%
+      unnest(KD)
+    uni_RT_lik <- left_join(unnest(select(filter(IV, type == "obs"),
+                                          -acc,-RT,-type, RT = rawRTs)),
+                            IV_density,
+                            by = c("practice", "OCpractice", "RT","group"))
+    uni_RT_lik <- sum(-log(uni_RT_lik$density))
+    error <- error + uni_RT_lik
+  }
+
+  joint_pred <- results$joint %>%
+    select(sameCue, practice, final, acc = probability, rawRTs = raw_joint_RTs) %>%
+    arrange(sameCue, practice, final)
+
+  joint <- bind_rows(mutate(joint_obs, type = "obs"),
+                     mutate(joint_pred, type = "pred"))
+
+  if (type %in% c("all","accuracy")) {
+    multinomial_lik <- select(joint, -contains("RT")) %>%
+      spread(type, acc) %>%
+      with(multinomialLL(obs, pred, N = 20))
+    error <- error + multinomial_lik
+  }
+
+  if (type %in% c("all","RT")) {
+    joint_density <- filter(joint, practice == 1, final ==1, type=="pred") %>%
+      select(group:final, rawRTs) %>%
+      rowwise() %>%
+      mutate(KD = list(ks::kde(rawRTs, H = matrix(c(1,0,0,1),2),  binned = TRUE,
+                               eval.points = x_axis_points)))
+    joint_density$KD <- lapply(joint_density$KD, function(k){
+      data.frame(pracRT = round(k$eval.points[[1]],1),
+                 finalRT = round(k$eval.points[[2]],1),
+                 density = k$estimate/sum(k$estimate))
+      })
+
+    joint_density <- filter(joint, practice == 1, final ==1, type=="obs") %>%
+      select(group:final, rawRTs) %>%
+      rowwise() %>%
+      mutate(rawRTs = list(setNames(as.data.frame(rawRTs), c("pracRT","finalRT"))),
+             rawRTs = list(as.data.frame(lapply(rawRTs, round, 1)))) %>%
+      unnest() %>%
+      left_join(unnest(select(joint_density, -rawRTs)),
+                c("group", "sameCue", "practice", "final", "pracRT", "finalRT"))
+    joint_RT_lik <- sum(-log(joint_density$density))
+    error <- error + joint_RT_lik
+  }
+}
+
