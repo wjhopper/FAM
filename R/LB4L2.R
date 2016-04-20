@@ -333,7 +333,6 @@ is.LB4L2 <- function(x) {
   return("LB4L" %in% class(x)[1])
 }
 
-
 #'@describeIn FAM_classes Checks if an R object has \code{LB4L_IV_summary} as it's
 #' first value of the \code{class} attribute.
 #' #' @export
@@ -348,21 +347,3 @@ is.LB4L2_CD_summary <- function(x) {
   return("LB4L_CD_summary" %in% class(x)[1])
 }
 
-#' Summarizing the raw LB4L2 dataset given practice test performance
-#'
-#' The LB4L2 experiment data is stored in 4 different data sets, each corresponding
-#' to a separate phase of the LB4L2 experiment (see LB4L2 datasets for more info). This
-#' is an S3 method for the generic function \code{\link{summary}} which returns a data frame reporting
-#' either the subject-level or condition-levels data from the final test in each experimental condition,
-#' given recall accuracy on one or both of the practice tests.
-#'
-#'
-#' @param data
-#' @param level
-#'
-#' @return
-#' @export
-#' @examples
-# summary.LB4L2_CD<- function(data, level) {
-#
-# }
