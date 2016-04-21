@@ -1,0 +1,308 @@
+---
+title: "LB4L-2 PCR Model"
+author: "Will Hopper"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+  fig_caption: yes
+toc: true
+toc_depth: 4
+css: custom.css
+params:
+  inpar: FALSE
+  routine: testing
+  mode: group
+  likelihood: accuracy
+  random_effects: FALSE
+  subset: FALSE
+---
+
+```{r setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE,fig.width=7,fig.height=7,cache=FALSE,
+                      warning=F, message=FALSE, fig.align='center')
+# library(FAM)
+devtools::load_all()
+library(dplyr) # requires 0.4.3.9000 for tibble()
+library(PCR)
+library(optimx)
+library(grid)
+library(gridExtra)
+library(ggplot2)
+library(xtable)
+library(doParallel)
+# library(digest)
+# library(whoppeR)
+# library(tidyr)
+```
+
+```{r data}
+final <- LB4L2_final %>%
+  mutate(acc = ifelse((RT < .2 & !is.na(RT)) | (RT > 8  & !is.na(RT)), 0, acc))
+practice <- LB4L2_tp %>%
+  mutate(acc = ifelse((RT < .2 & !is.na(RT)) | (RT > 8  & !is.na(RT)), 0, acc))
+
+sub_RT <- summary(as_LB4L(final), level = "subject") %>%
+  filter(practice != "T", OCpractice != "T", final_acc ==1, probability !=0) %>%
+  select(group, practice, OCpractice, final_acc, RT) %>%
+  group_by(group, practice, OCpractice, final_acc) %>%
+  summarise(rawRTs = list(round(RT,1)))
+
+IV_obs <- summary(as_LB4L(final), level = params$mode) %>%
+  select(group:OCpractice, final_acc, acc = probability_mean, RT = RT_mean) %>%
+  inner_join(sub_RT)
+rm(sub_RT)
+
+joint_obs_sub <- summary(as_LB4L(final, practice_tests = 2), level = "subject",
+                         given_practice = 1,  given_data = practice) %>%
+  filter(probability != 0) %>%
+  select(group:final_acc, contains("RT")) %>%
+  group_by(group, sameCue, practice1acc,final_acc) %>%
+  summarise(rawRTs = list(matrix(c(practice1RT, RT), ncol = 2)))
+
+joint_obs <- summary(as_LB4L(final, practice_tests = 2), level = "group",
+                     given_practice = 1,  given_data = practice) %>%
+  select(group:final_acc, acc = probability_mean, RT = RT_mean) %>%
+  inner_join(joint_obs_sub, by = c("group", "sameCue", "practice1acc", "final_acc")) %>%
+  rename(practice = practice1acc, final = final_acc) %>%
+  rowwise() %>%
+  mutate(rawRTs = if(final == 1 & practice == 1) {list(rawRTs)} else {list(NULL)},
+         RT = NULL)
+rm(joint_obs_sub)
+
+
+if (params$mode == "group") {
+  joint_obs$subject = 1
+  IV_obs$subject = 1
+} else {
+  stopifnot(all.equal(unique(joint_obs$subject), unique(IV_obs$subject)))
+}
+```
+
+```{r model_parameters}
+acc_params <- c("ER","LR","FR","FR2","TR","space")
+RT_params <- c("Tmin","lambda")
+theta <- list(ER=.56, LR=.2, FR=.15, FR2=.3, TR=.02, space = .02,
+                   Tmax = 8, Tmin = 0.2, lambda = .25)
+parameter_sets <- switch(params$likelihood,
+                         accuracy = list(acc_params),
+                         RT = list(RT_params),
+                         all = list(acc_params, RT_params, c(acc_params, RT_params)))
+stopifnot(!is.null(parameter_sets))
+
+if (params$mode == "subject") {
+  groups <- 1
+  if (params$random_effects) {
+    theta <- tibble(~subject, ~ER, ~LR, ~FR, ~TR, ~space, ~Tmax, ~Tmin, ~lambda,
+                          1,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          2,        .55, .12, .15, .05, .03,    8,     .02,   .5,
+                          3,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          4,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          5,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          6,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          7,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          8,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          9,        .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          11,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          12,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          13,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          14,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          15,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          16,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          17,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          19,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          20,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          21,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          22,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          23,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          24,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          25,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          26,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          27,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          28,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          29,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          30,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          31,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          32,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          33,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          34,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          35,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          36,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          37,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          38,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          39,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          41,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          42,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          43,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          44,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          45,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          46,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          47,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          48,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          49,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          50,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          52,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          53,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          54,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          55,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          56,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          56,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          57,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          58,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          59,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          60,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          61,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          62,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          63,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          64,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          65,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          66,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          67,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          68,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          69,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          70,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          71,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          72,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          73,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          74,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          75,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          76,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          77,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          78,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          79,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          81,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          82,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5,
+                          83,       .6,  .15, .1,  .1,  .02,    8,     .02,   .5) %>%
+      as.data.frame() %>%
+      split(seq_len(nrow(.)))
+    stopifnot(length(theta == length(unique(IV_obs$subject))))
+    
+  }
+  
+  model <- replicate(n = length(unique(IV_obs$subject)),
+                     expr = initPCR(params = theta, distribution = "binomial",
+                                    nItems = 20, nSims = 1000, nFeatures = 100,
+                                    time = 10),
+                     simplify = FALSE)
+
+} else if (params$mode == "group") {
+  groups <- 2
+  model <- initPCR(params = theta, distribution = "binomial", nItems = 20,
+                   nSims = 1000, nFeatures = 100, time = 10)
+  theta <- list("group_params" = theta)
+  model <- list("group_model" = model)
+}
+
+```
+
+```{r fitting_routine}
+subs <- unique(IV_obs$subject)
+if (params$subset != FALSE && is.numeric(params$subet)) {  
+  subs <- subs[subs %in% params$subset]
+}
+
+if (params$routine =="minimize") {
+  iterations <- 1000
+} else {
+  iterations <- 1
+}
+
+param_search <- function(theta, PCR, parameter_sets) {
+
+  index = globalenv()$j
+  results <- optimx(par = unlist(theta[ parameter_sets[[1]] ]), 
+                    fn = fitPCR,
+                    method="Nelder-Mead",
+                    itnmax = globalenv()$iterations,
+                    control = list(kkt=FALSE),
+                    PCRparams_obj = PCR, # for fn
+                    objective_fcn = LB4L2_PCR, # for fn
+                    error_fcn = LB4L2_PCR_erf,# for fn
+                    groups = globalenv()$groups, # for objective_fn
+                    IV_obs = filter(IV_obs, subject == index), # for error_fcn
+                    joint_obs = filter(joint_obs, subject == index), # for error_fcn
+                    likelihood = params$likelihood) # for error_fcn
+  results <- cbind(results[names(results) %in% names(theta)],
+                   theta[!names(theta) %in% names(results)],
+                   results[!names(results) %in% names(theta)])
+  
+  done <- 1
+  while (done < length(parameter_sets)) {
+    new <- as.list(as.data.frame(results[done, names(results) %in% names(theta)]))
+    PCR = update(PCR, new)
+    next_results <- param_search(theta, PCR, parameter_sets[done+1])
+    results <- rbind(results, next_results)
+    done <- done + 1
+  }
+  return(results)
+}
+```
+
+```{r fit, include=FALSE}
+if (params$inpar) {
+  cluster <- doParallelCluster(detectCores()-1)
+}
+
+if (params$inpar && !is.null(cluster$success)) {
+  # Logging
+  message(paste("Log at", cluster$logfile))
+  cat(paste('[',Sys.time(),']',"INIT parlog"), file=logfile, sep='\n')
+
+  fit <- foreach(j = subs, .verbose=T, .packages=c("optimx","FAM")) %dopar% {
+     r <- param_search(theta = theta[[j]], PCR = model[[j]], parameter_sets, index = j)
+  }
+  
+  stopCluster(cluster$handle)
+  cat(paste('[',Sys.time(),']',"Finished Fitting"), file=logfile,sep='\n')
+
+} else {
+  fit <- foreach(j = subs) %do% {
+    message(paste('[',Sys.time(),']', "Fitting subject", j))
+     r <- param_search(theta = theta[[j]], PCR = model[[j]], parameter_sets)
+  }
+}
+fit <- as.data.frame(unlist(fit, recursive=F))
+```
+
+```{r best_fitting_predictions}
+best_params <- fit[1, names(fit) %in% c(RT_params,acc_params), drop =F]
+best_model <- Map(update, model, list(as.list(best_params)))
+raw_preds <- LB4L2_PCR(best_model[[1]], groups = groups)
+if (length(raw_preds) > 1) {
+  best_preds <- lapply(raw_preds, summary)
+  best_preds <- do.call(mapply, c(list(FUN = bind_rows), best_preds , list(.id = "group")))
+} else {
+  best_preds <- summary(raw_preds)
+}
+```
+
+## Parameters
+```{r modelInfo,results='asis'}
+print(xtable(cbind(best_params, D = 2*fit[1,"value"]), digits=3),
+      type = "html", include.rownames=FALSE, caption.placement="top")
+```
+
+## Plots
+```{r plots}
+IV_pred <- best_preds$final %>%
+    select(group, practice, OCpractice, accuracy,
+           acc = proportion, RT = medianRT, rawRTs = rawRTs) %>%
+    rowwise() %>%
+    mutate(rawRTs = list(round(rawRTs,1)),
+           group = if(group == "group1") {"immediate"} else {"delay"})
+IV <- summary(as_LB4L(final), level = params$mode) 
+
+acc <- autoplot(IV, DV = "accuracy") + 
+  geom_point(aes(x = group, y = acc, color = interaction(practice, OCpractice)),
+             data = filter(IV_pred, accuracy ==1),
+             position = position_jitter(.05),
+             inherit.aes = FALSE, shape = 18, size = 3) + 
+  ggtitle("PCR vs. Obs.")
+print(acc)
+RT <- autoplot(IV, DV = "RT") +  
+  geom_point(aes(x = group, y = RT, color = interaction(practice, OCpractice)),
+             data = rename(IV_pred, final_acc = accuracy),
+             position = position_jitter(.05),
+             inherit.aes = FALSE, shape = 18, size = 3) + 
+  ggtitle("PCR vs. Obs.")
+print(RT)
+```
