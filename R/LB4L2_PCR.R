@@ -17,7 +17,7 @@
 #'                    nFeatures = 100, time = 10)
 #' results <- LB4L2_PCR(model_params)
 #'
-LB4L2_PCR <- function(PCR_model_obj, groups = 1) {
+LB4L2_PCR <- function(PCR_model_obj, groups = 1, ...) {
 
   stopifnot(is.finite(groups) && groups > 0)
   results <- vector (mode = "list", length = groups)
@@ -53,7 +53,7 @@ LB4L2_PCR <- function(PCR_model_obj, groups = 1) {
   done <- 1
   while (done < groups) {
     x <- update(PCR_model_obj, list(FR = PCR_model_obj$params[[paste0("FR",done+1)]]))
-    results[done + 1]<- LB4L2_PCR(PCR_model_obj, groups = 1)
+    results[done + 1]<- LB4L2_PCR(x, groups = 1)
     class(results[[done + 1]]) <- c("LB4L2_PCR", class(results))
     done <- done + 1
     if (done == length(results)) {
@@ -149,17 +149,30 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
 #' @export
 #'
 #' @examples
+
 fitPCR <- function(parameters = NULL, PCRparams_obj, objective_fcn, error_fcn, ...) {
-  if (!is.null(parameters)) {
-    if (!is.vector(parameters)) {
-      stop('"parameters" argument must be a named list with scalar numeric elements')
-    } else if (all(vapply(parameters, Negate(is.null), logical(1))) && all(vapply(parameters, is.finite, logical(1)))) {
-      PCRparams_obj <- updatePCRparams(as.list(parameters))
-    }
+
+  # if (!is.null(parameters)) {
+  #   if (!is.vector(parameters)) {
+  #     stop('"parameters" argument must be a named list with scalar numeric elements')
+  #   } else if (all(vapply(parameters, Negate(is.null), logical(1))) && all(vapply(parameters, is.finite, logical(1)))) {
+  #     PCRparams_obj <- update(PCRparams_obj, as.list(parameters))
+  #   }
+  # }
+  if (anyNA(sapply(parameters, function(x) x <= 0 || x >= 1))) {
+    return(1000000)
+  }
+  options(error = recover)
+  PCRparams_obj <- update(PCRparams_obj, as.list(parameters))
+
+  raw <- objective_fcn(PCRparams_obj, groups = list(...)$group)
+  if (length(raw) > 1) {
+    results <- lapply(raw, summary)
+    results <- do.call(mapply, c(list(FUN = bind_rows), results , list(.id = "group")))
+  } else {
+    results <- summary(raw)
   }
 
-  raw <- objective_fcn(PCRparams_obj)
-  results <- summary(raw)
   error <- error_fcn(results, ...)
   return(error)
 
@@ -170,7 +183,7 @@ fitPCR <- function(parameters = NULL, PCRparams_obj, objective_fcn, error_fcn, .
 #' @param results
 #' @param IV_obs
 #' @param joint_obs
-#' @param type
+#' @param likelihood
 #'
 #' @return
 #'
@@ -181,29 +194,31 @@ fitPCR <- function(parameters = NULL, PCRparams_obj, objective_fcn, error_fcn, .
 #' @export
 #'
 #' @examples
-LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, type = c("RT","accuracy","all")) {
+LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accuracy","all"), ...) {
 
-  type <- match.arg(type,  c("RT","accuracy","all"))
+  likelihood <- match.arg(likelihood,  c("RT","accuracy","all"))
   error <- 0
+
 
   IV_pred <- results$final %>%
     filter(practice != "T", OCpractice != "T", accuracy == 1) %>%
-    select(practice, OCpractice, accuracy, acc = proportion, RT = medianRT, rawRTs = rawRTs) %>%
+    select(group, practice, OCpractice, accuracy, acc = proportion, RT = medianRT, rawRTs = rawRTs) %>%
     semi_join(IV_obs, by = c("practice", "OCpractice", "accuracy"="final_acc")) %>%
     rowwise() %>%
-    mutate(rawRTs = list(round(rawRTs,1)))
+    mutate(rawRTs = list(round(rawRTs,1)),
+           group = if(group == "group1") {"immediate"} else {"delay"})
 
   IV <- bind_rows(mutate(IV_obs, type = "obs", final_acc = NULL),
-                  mutate(IV_pred, type = "pred", accuracy = NULL))
+                  mutate(IV_pred, type = "pred", subject = IV_obs$subject[1], accuracy = NULL))
 
-  if (type %in% c("all","accuracy")) {
+  if (likelihood %in% c("all","accuracy")) {
     binom_lik <- select(IV,group:acc,type) %>%
       spread(type, acc) %>%
       with(binomialLL(obs = obs, pred = pred, N = 20))
     error <- error + binom_lik
   }
 
-  if (type %in% c("all","RT")) {
+  if (likelihood %in% c("all","RT")) {
     IV_density<- select(filter(IV, type == "pred"),-acc,-RT,-type) %>%
       rowwise() %>%
       mutate(KD = list(density(rawRTs, bw = 1, from = .1, to = 8, n = 80)[c("x","y")]))
@@ -221,20 +236,23 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, type = c("RT","accuracy","
   }
 
   joint_pred <- results$joint %>%
-    select(sameCue, practice, final, acc = probability, rawRTs = raw_joint_RTs) %>%
-    arrange(sameCue, practice, final)
+    select(group, sameCue, practice, final, acc = probability, rawRTs = raw_joint_RTs) %>%
+    arrange(sameCue, practice, final) %>%
+    rowwise() %>%
+    mutate(group = if(group == "group1") {"immediate"} else {"delay"})
 
   joint <- bind_rows(mutate(joint_obs, type = "obs"),
-                     mutate(joint_pred, type = "pred"))
+                     mutate(joint_pred, type = "pred", subject = joint_obs$subject[1]))
 
-  if (type %in% c("all","accuracy")) {
+  if (likelihood %in% c("all","accuracy")) {
     multinomial_lik <- select(joint, -contains("RT")) %>%
       spread(type, acc) %>%
       with(multinomialLL(obs, pred, N = 20))
     error <- error + multinomial_lik
   }
 
-  if (type %in% c("all","RT")) {
+  if (likelihood %in% c("all","RT")) {
+    x_axis_points <- expand.grid(seq(.1,8,by=.1), seq(.1,8,by=.1))
     joint_density <- filter(joint, practice == 1, final ==1, type=="pred") %>%
       select(group:final, rawRTs) %>%
       rowwise() %>%
@@ -257,5 +275,6 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, type = c("RT","accuracy","
     joint_RT_lik <- sum(-log(joint_density$density))
     error <- error + joint_RT_lik
   }
+  return(error)
 }
 

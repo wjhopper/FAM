@@ -4,10 +4,11 @@
 \alias{LB4L2_PCR_erf}
 \title{LB4L2_PCR Error Function}
 \usage{
-LB4L2_PCR_erf(results, IV_obs, joint_obs, type = c("RT", "accuracy", "all"))
+LB4L2_PCR_erf(results, IV_obs, joint_obs, likelihood = c("RT", "accuracy",
+  "all"), ...)
 }
 \arguments{
-\item{type}{}
+\item{likelihood}{}
 }
 \value{
 
