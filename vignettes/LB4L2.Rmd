@@ -22,7 +22,7 @@ img {
 
 </style>
 ```{r setup, include=FALSE}
-library(FAM)
+devtools::load_all()
 library(dplyr)
 library(whoppeR)
 library(ggplot2)
@@ -57,6 +57,9 @@ autoplot(IV, DV = "accuracy")
 
 ## Conditional Accuracy and RT
 ```{r conditionals, fig.align='center', fig.width = 9}
+CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
+autoplot(CD_1, DV = "RT")
+autoplot(CD_1, DV = "accuracy")
 ```
 
 ## Joint Accuracy and RT

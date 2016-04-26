@@ -185,44 +185,67 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
     y_label <- ylab("Mean Accuracy")
   }
 
-  y_val <- grep(paste0('^', DV, '(?!_sd)'), names(data),
-                value = TRUE, perl = TRUE, ignore.case = TRUE)
+  lookup_table <- c("0" = "Incorect", "1" = "Correct")
+  labels_fun <- labeller(practice1acc = setNames(paste("Practice Test", lookup_table), names(lookup_table)),
+                         practice2acc = setNames(paste("Practice Test 2", lookup_table), names(lookup_table)),
+                         final_acc = setNames(paste("Final Test", lookup_table), names(lookup_table)),
+                         sameCue = c("no" = "Unpracticed Cue", "yes" = "Tested Cue"))
+  y_val <- grep_for_y(DV, names(data))
+  prac_vars <-grep("practice", names(data), value = TRUE)
+  n_prac_vars <- length(prac_vars)
+  data[, prac_vars] <- lapply(data[, prac_vars], as.factor)
+  if (length(prac_vars) > 1) {
+    prac_vars <- paste0("interaction(", paste0(prac_vars, collapse = ","), ")",
+                        collapse = "")
+  }
+  aes_mapping <- aes_string(x = "group", y = y_val,  color = prac_vars, group = prac_vars)
 
-  p <- ggplot(data = data,
-              aes_string(x = "group", y = y_val,
-                         color = "interaction(practice, OCpractice)",
-                         group =" interaction(practice, OCpractice)")) +
+  # Basic Plot
+  p <- ggplot(data = data, mapping = aes_mapping) +
     geom_point(size=2) +
-    geom_line(size=1) +
-    scale_color_discrete("Practice\nCondition",
-                         breaks = c("N.N","N.S","N.T","S.N","T.N"),
-                         labels = c(N.N = "Baseline", N.S ="Other Cue Study", S.N = "Restudy",
-                                    N.T = "Other Cue Test", T.N = "Test Same Cue")) +
-    scale_x_discrete("Group",expand=c(0,.25),
+    geom_line(size=.75) +
+    scale_x_discrete("Group",expand=c(0,.35),
                      limits = c("immediate", "delay"),
                      labels=c("Immediate","Delay")) +
     theme(legend.key.height = unit(2,"line")) +
-    y_label +
-    ggtitle('Final Test')
+    y_label
+
+  if (any(grepl("practice[0-9]+acc", names(data)))) {
+    # apply(permutations(2,2, c(0,1), repeats.allowed = TRUE), 1, paste0, collapse = ".")
+    p <- p + scale_color_discrete("Practice\nAccuracy",
+                                  breaks = c("0", "1", "0.0", "0.1", "1.0", "1.1"),
+                                  labels = c("0"="Inc", "1"="Cor",
+                                             "0.0"="Inc,Inc", "0.1"="Inc,Cor",
+                                             "1.0"= "Cor,Inc", "1.1"="Cor,Cor")) +
+      ggtitle('Final Test Condtional')
+  } else if ( is.element("OCpractice", names(data)) ) {
+    p <- p + scale_color_discrete("Practice\nCondition",
+                                  breaks = c("N.N","N.S","N.T","S.N","T.N"),
+                                  labels = c(N.N = "Baseline", N.S ="Other Cue Study",
+                                             S.N = "Other Cue Study", N.T = "Other Cue Test",
+                                             T.N = "Same Cue Test")) +
+      ggtitle('Final Test')
+  }
+
+  ## Faceting
+  facet_vars <- paste(intersect("sameCue", names(data)),
+                      intersect("final_acc", names(data)),
+                      collapse = "", sep = "~")
+  if (facet_vars != "") {
+    if (grepl("~$", facet_vars)) {
+      facet_vars <- paste0("~", gsub("~$", "", facet_vars))
+    }
+    p <- p + facet_grid(facet_vars, labeller = labels_fun)
+  }
 
   if (!("subject" %in% names(data))) {
-    table <- c("probability" = "acc", "RT" = "RT")
-    err_val <- grep(paste0('^sem_', table[DV]), names(data),
-                      value = TRUE, perl = TRUE, ignore.case = TRUE)
+    err_val <- grep_for_error(DV, names(data))
     vals <- list(x = as.name(y_val), y = as.name(err_val))
     data %<>% mutate_(upper = interp(~ x + y, .values = vals),
                       lower = interp(~ x - y, .values = vals))
     p <- p + geom_errorbar(aes(ymax = upper, ymin = lower),
                            data = data, width = .025)
   }
-
-  if (DV == "RT" && "final_acc" %in% names(data)) {
-    lookup_table <- c(`0` = "Incorrect", `1` = "Correct")
-    p <- p + facet_grid(~final_acc,
-                        labeller = labeller(final_acc = lookup_table))
-  }
-
-
   return(p)
 }
 
@@ -230,53 +253,21 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
 #'
 #' @param data An LB4L2_IV_summary data frame from the FAM package.
 #' @export
-autoplot.LB4L_CD_summary <- function(data) {
-
-  lookup_table <- c("0" = "Incorect", "1" = "Correct")
-  labels_fun <- labeller(practice1acc = setNames(paste("Practice Test 1", lookup_table), names(lookup_table)),
-                         practice2acc = setNames(paste("Practice Test 2", lookup_table), names(lookup_table)),
-                         final_acc = setNames(paste("Final Test", lookup_table), names(lookup_table)))
-
-  if ("median_RT" %in% names(data)) {
-    data$cond <- interaction(data$practice, data$OCpractice)
-    p <- ggplot(data = data,
-                aes_string(x = "group", y = "median_RT", color = "cond", group = "cond")) +
-      geom_point(size=3, shape = 2) +
-      facet_grid(~final_acc, labeller = labels_fun) +
-      ylab("Median First-Press Latency") +
-      scale_color_discrete("Practice\nCondition",
-                           breaks = c("N.N","N.S","N.T","S.N","T.N"),
-                           labels = c(N.N = "Baseline", N.S ="Other Cue Study", S.N  = "Restudy",
-                                      N.T = "Other Cue Test", T.N = "Test Same Cue"))
-
-  } else if ("avg_final_acc" %in% names(data)) {
-    givens <- grep("practice", names(data), value = TRUE)
-
-
-    p <- ggplot(data = data,
-                aes_string(x = "group", y = "avg_final_acc", color = "sameCue", group = "sameCue")) +
-      geom_point(size=3) +
-      facet_grid(~practice1acc, labeller = labels_fun) +
-      geom_errorbar(aes(ymax = avg_final_acc + sem_final_acc,
-                        ymin = avg_final_acc - sem_final_acc),
-                    width = .025) +
-      scale_color_discrete("Cue Used", breaks = c("no","yes"),
-                           labels = c(no = "Other Cue", yes ="Same Cue")) +
-      ylab("Condtional Accuracy")
-
-  } else {
-    stop("Did not recognize any DV columns in this LB4L_IV_summary object")
-  }
-
-  p <- p +  geom_line(size=1) +
-    scale_x_discrete("Group",expand=c(0,.25),
-                     limits = c("immediate", "delay"),
-                     labels=c("Immediate","Delay")) +
-    theme(legend.key.height = unit(2,"line")) +
-    ggtitle('Final Test Accuracy given Practice Test Accuracy')
-
+autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
+  p <- autoplot.LB4L_IV_summary(data,DV)
   return(p)
+}
 
+#'
+grep_for_y <- function(DV, variables) {
+  y_val <- grep(paste0('^', DV, '(?!_sd)'), variables,
+                value = TRUE, perl = TRUE, ignore.case = TRUE)
+}
+#'
+grep_for_error <- function(DV, variables) {
+  table <- c("probability" = "acc", "RT" = "RT")
+  grep(paste0('^sem_', table[DV]), variables,
+       value = TRUE, perl = TRUE, ignore.case = TRUE)
 }
 
 #' @describeIn FAM_classes Creates a data frame with the primary class "LB4L"
