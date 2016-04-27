@@ -2,6 +2,7 @@
 
 S3method(autoplot,LB4L_CD_summary)
 S3method(autoplot,LB4L_IV_summary)
+S3method(autoplot,LB4L_joint_summary)
 S3method(summary,LB4L)
 export(CFR_PCR)
 export(IVsummary)

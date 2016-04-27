@@ -174,15 +174,20 @@ reshaping <- function(long_data) {
 #' \code{"RT"}
 #' @importFrom lazyeval interp
 #' @export
-autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
+autoplot.LB4L_IV_summary <- function(data, DV = "accuracy", joint = FALSE) {
 
   if (grepl("rt", DV, ignore.case = TRUE)) {
     DV <- "RT"
-    y_label <- ylab("Mean of Median First-Press Latency")
+    y_axis <- ylab("Mean of Median First-Press Latency")
+
   } else if (grepl("acc", DV, ignore.case = TRUE)) {
-    data <- select(filter(data, final_acc == 1), -final_acc)
     DV <- "probability"
-    y_label <- ylab("Mean Accuracy")
+    if (!joint) {
+      data <- select(filter(data, final_acc == 1), -final_acc)
+      y_axis <- scale_y_continuous("Mean Accuracy", limits = c(0,1))
+    } else {
+      y_axis <- scale_y_continuous("Joint Probability", limits = c(0,1))
+    }
   }
 
   lookup_table <- c("0" = "Incorect", "1" = "Correct")
@@ -208,7 +213,7 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
                      limits = c("immediate", "delay"),
                      labels=c("Immediate","Delay")) +
     theme(legend.key.height = unit(2,"line")) +
-    y_label
+    y_axis
 
   if (any(grepl("practice[0-9]+acc", names(data)))) {
     # apply(permutations(2,2, c(0,1), repeats.allowed = TRUE), 1, paste0, collapse = ".")
@@ -253,7 +258,13 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
 #'
 #' @param data An LB4L2_IV_summary data frame from the FAM package.
 #' @export
-autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
+autoplot.LB4L_CD_summary <- function(data, DV = "accuracy", joint = TRUE) {
+  p <- autoplot.LB4L_IV_summary(data,DV,joint)
+  return(p)
+}
+
+#' @export
+autoplot.LB4L_joint_summary <- function(data, DV = "accuracy", joint = TRUE) {
   p <- autoplot.LB4L_IV_summary(data,DV)
   return(p)
 }

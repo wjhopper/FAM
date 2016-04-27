@@ -4,10 +4,13 @@
 \alias{autoplot.LB4L_IV_summary}
 \title{Plot Accuracy or RT for each experimental condition of the LB4L2 dataset}
 \usage{
-\method{autoplot}{LB4L_IV_summary}(data)
+\method{autoplot}{LB4L_IV_summary}(data, DV = "accuracy", joint = FALSE)
 }
 \arguments{
 \item{data}{An LB4L2_IV_summary data frame from the FAM package.}
+
+\item{DV}{A character vector specifying which DV to plot, \code{"accuracy"} or
+\code{"RT"}}
 }
 \description{
 Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
