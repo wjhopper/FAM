@@ -24,26 +24,31 @@ LB4L2_PCR <- function(PCR_model_obj, groups = 1, ...) {
 
   control <- study(PCR_model_obj, nCues = 1, tests_per_cue = 1) %>%
     forget(cue = 1) %>%
+    thresh_change() %>%
     cuedRecall(cue = 1, increment = FALSE)
 
   SC_study <- study(PCR_model_obj, nCues = 2, tests_per_cue = c(1,0)) %>%
     study(cue = 1) %>%
     forget(cue = 1) %>%
+    thresh_change() %>%
     cuedRecall(cue = 1, increment = FALSE)
 
   OC_study <- study(PCR_model_obj, nCues = 2, tests_per_cue = c(1,0)) %>%
     study(cue = 2) %>%
     forget(cue = 1) %>%
+    thresh_change() %>%
     cuedRecall(cue = 1, increment = FALSE)
 
   SC_test <- study(PCR_model_obj, nCues = 2, tests_per_cue = c(2,0)) %>%
     cuedRecall(cue = 1) %>%
     forget(cue = 1) %>%
+    thresh_change() %>%
     cuedRecall(cue = 1, increment = FALSE)
 
   OC_test <- study(PCR_model_obj, nCues = 2, tests_per_cue = c(1,1)) %>%
     cuedRecall(cue = 2) %>%
     forget(cue = 1) %>%
+    thresh_change() %>%
     cuedRecall(cue = 1, increment = FALSE)
 
   results[[1]] <- list("SC_test" = SC_test, "SC_study" = SC_study,
