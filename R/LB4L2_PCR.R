@@ -150,20 +150,23 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
 #'
 #' @examples
 
-fitPCR <- function(parameters = NULL, PCRparams_obj, objective_fcn, error_fcn, ...) {
+fitPCR <- function(free_parameters, PCRparams_obj, objective_fcn, error_fcn, ...) {
 
-  # if (!is.null(parameters)) {
-  #   if (!is.vector(parameters)) {
-  #     stop('"parameters" argument must be a named list with scalar numeric elements')
-  #   } else if (all(vapply(parameters, Negate(is.null), logical(1))) && all(vapply(parameters, is.finite, logical(1)))) {
-  #     PCRparams_obj <- update(PCRparams_obj, as.list(parameters))
-  #   }
-  # }
-  if (anyNA(sapply(parameters, function(x) x <= 0 || x >= 1))) {
+  PCRparams_obj <- update(PCRparams_obj, as.list(free_parameters))
+  acc_param_vals <- PCRparams_obj$params[names(PCRparams_obj$params) %in% c("ER","LR","FR","FR2","TR","space","TC")]
+  RT_param_vals <- PCRparams_obj$params[c("Tmin", "Tmax", "lambda")]
+
+  if (any(sapply(acc_param_vals, function(x) x <= 0.01 || x >= .99))) {
     return(1000000)
   }
-  options(error = recover)
-  PCRparams_obj <- update(PCRparams_obj, as.list(parameters))
+
+  if (any(sapply(RT_param_vals, function(x) x <= 0))) {
+    return(1000000)
+  }
+
+  if (RT_param_vals$Tmin > RT_param_vals$Tmax) {
+    return(1000000)
+  }
 
   raw <- objective_fcn(PCRparams_obj, groups = list(...)$group)
   if (length(raw) > 1) {
