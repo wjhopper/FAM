@@ -14,7 +14,7 @@ Imports:
     reshape2,
     tidyr,
     whoppeR (>= 0.0.0.9004),
-    PCR (>= 1.0.3)
+    PCR (>= 1.0.4)
 Suggests:
     knitr,
     grid,
