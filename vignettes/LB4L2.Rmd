@@ -38,13 +38,13 @@ identical(summary(LB4L2_final, level = "group", given_practice = 1:2, conditiona
 CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1, conditional = TRUE)
 CD_2 <- summary(LB4L2_final, level = "group", given_practice = 2, conditional = TRUE)
 
-CD_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE, conditional = TRUE)
-joint_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE)
-identical(CD_raw, joint_raw)
-
 joint <- summary(LB4L2_final, level = "group", given_practice = TRUE)
 joint_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
 joint_2 <- summary(LB4L2_final, level = "group", given_practice = 2)
+
+CD_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE, conditional = TRUE)
+joint_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE)
+identical(CD_raw, joint_raw)
 ```
 
 ## Accuracy and RT by Experimental Condition
@@ -54,7 +54,6 @@ autoplot(IV, DV = "RT")
 autoplot(IV, DV = "accuracy")
 ```
 
-
 ## Conditional Accuracy and RT
 ```{r conditionals, fig.align='center', fig.width = 9}
 CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
@@ -63,43 +62,10 @@ autoplot(CD_1, DV = "accuracy")
 ```
 
 ## Joint Accuracy and RT
-```{r joint, fig.align='center', warning=FALSE, fig.width = 9, eval = FALSE}
-joint_acc_prac1 <- summary(LB4L2_final, level = "group", given_practice = 1)
-joint_acc_prac1$cell = interaction(joint_acc_prac1$practice1acc, joint_acc_prac1$final_acc)
-lookup_table <- c("1.1" ="+ / +", "1.0"  =  "+ / -", "0.1"  = "- / +", "0.0" = "- / -")
-
-ggplot(joint_acc_prac1, aes(x = group, y= probability, color = sameCue, group = sameCue)) + 
-  geom_point(size = 3) + 
-  geom_line(size = 1) + 
-  facet_grid(~cell,labeller = labeller(cell = lookup_table)) + 
-  scale_color_discrete("Cue Used", breaks = c("no","yes"),
-                       labels = c(no = "Other Cue", yes ="Same Cue")) +
-  scale_x_discrete("Group",expand=c(0,.25),
-                 limits = c("immediate", "delay"),
-                 labels=c("Immediate","Delay")) +
-  theme_larger(1.75) + 
-  ggtitle('Joint Distribution of Practice and Final Test Outcomes')
-
-raw_joint_RT_prac1  <- summary(LB4L2_final, level= "raw", DV = "RT",
-                                given_practice = 1, given_final = TRUE)
-raw_joint_RT_prac1$cell = interaction(raw_joint_RT_prac1$practice1acc,
-                                      raw_joint_RT_prac1$final_acc)
-
-ggplot(raw_joint_RT_prac1, aes(x = practice1RT, y= final_RT, color = group)) + 
-  geom_point(size = 3, alpha = .4) + 
-  geom_smooth(se = FALSE, na.rm = TRUE, method = "lm") + 
-  facet_wrap(~cell,labeller = labeller(cell = lookup_table)) + 
-  ylab("Final Test First-Press Latency") + 
-  xlab("Practice Test First-Press Latency") + 
-  theme_larger(1.75) + 
-  ggtitle('Joint Distribution of Practice and Final Test Outcomes')
-
-ggplot(raw_joint_RT_prac1, aes(x = practice1RT, y= final_RT - practice1RT, color = group)) + 
-  geom_point(size = 3, alpha = .4) + 
-  facet_wrap(~cell,labeller = labeller(cell = lookup_table)) + 
-  ylab("Final - Practice Test F.P. Latency") + 
-  xlab("Practice Test First-Press Latency") + 
-  theme_larger(1.75) + 
-  ggtitle('Difference in RT across Practice & Final Test Outcomes')
-
+```{r joint, fig.align='center', warning=FALSE, fig.width = 9}
+joint_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
+autoplot(joint_1, DV = "accuracy", joint = TRUE) +
+  ggtitle("Final Test Joint Distribution")
+autoplot(joint_1, DV = "RT", joint = TRUE) +
+  ggtitle("Final Test Joint Distribution")
 ```
