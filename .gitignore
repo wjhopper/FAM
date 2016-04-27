@@ -4,3 +4,11 @@
 inst/doc
 .build.timestamp
 /*.R*
+./man/CFR_PCR.Rd
+./man/IVsummary.Rd
+./man/LB4L_PCRss.Rd
+./man/RTdist.Rd
+./man/fitLB4L.Rd
+./man/heirarchicalSummary.Rd
+./man/performanceBins.Rd
+
