@@ -26,7 +26,7 @@ devtools::load_all()
 library(dplyr)
 library(whoppeR)
 library(ggplot2)
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.align='center', fig.width = 9)
 ```
 
 ```{r tests, include=FALSE, eval=FALSE}
@@ -48,24 +48,22 @@ identical(CD_raw, joint_raw)
 ```
 
 ## Accuracy and RT by Experimental Condition
-```{r IV, fig.align='center', fig.width = 9}
+```{r IV, }
 IV <- summary(LB4L2_final, level = "group")
-autoplot(IV, DV = "RT")
 autoplot(IV, DV = "accuracy")
+autoplot(IV, DV = "RT")
 ```
 
 ## Conditional Accuracy and RT
-```{r conditionals, fig.align='center', fig.width = 9}
-CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
-autoplot(CD_1, DV = "RT")
+```{r conditionals}
+CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1, conditional = TRUE)
 autoplot(CD_1, DV = "accuracy")
+autoplot(CD_1, DV = "RT")
 ```
 
 ## Joint Accuracy and RT
-```{r joint, fig.align='center', warning=FALSE, fig.width = 9}
+```{r joint}
 joint_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
-autoplot(joint_1, DV = "accuracy", joint = TRUE) +
-  ggtitle("Final Test Joint Distribution")
-autoplot(joint_1, DV = "RT", joint = TRUE) +
-  ggtitle("Final Test Joint Distribution")
+autoplot(joint_1, DV = "accuracy")
+autoplot(joint_1, DV = "RT")
 ```

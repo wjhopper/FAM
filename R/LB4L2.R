@@ -190,83 +190,18 @@ reshaping <- function(long_data) {
 #' \code{"RT"}
 #' @importFrom lazyeval interp
 #' @export
-autoplot.LB4L_IV_summary <- function(data, DV = "accuracy", joint = FALSE) {
+autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
 
-  if (grepl("rt", DV, ignore.case = TRUE)) {
-    DV <- "RT"
-    y_axis <- ylab("Mean of Median First-Press Latency")
-
-  } else if (grepl("acc", DV, ignore.case = TRUE)) {
-    DV <- "probability"
-    if (!joint) {
-      data <- select(filter(data, final_acc == 1), -final_acc)
-      y_axis <- scale_y_continuous("Mean Accuracy", limits = c(0,1))
-    } else {
-      y_axis <- scale_y_continuous("Joint Probability", limits = c(0,1))
-    }
-  }
-
-  lookup_table <- c("0" = "Incorect", "1" = "Correct")
-  labels_fun <- labeller(practice1acc = setNames(paste("Practice Test", lookup_table), names(lookup_table)),
-                         practice2acc = setNames(paste("Practice Test 2", lookup_table), names(lookup_table)),
-                         final_acc = setNames(paste("Final Test", lookup_table), names(lookup_table)),
-                         sameCue = c("no" = "Unpracticed Cue", "yes" = "Tested Cue"))
-  y_val <- grep_for_y(DV, names(data))
-  prac_vars <-grep("practice", names(data), value = TRUE)
-  n_prac_vars <- length(prac_vars)
-  data[, prac_vars] <- lapply(data[, prac_vars], as.factor)
-  if (length(prac_vars) > 1) {
-    prac_vars <- paste0("interaction(", paste0(prac_vars, collapse = ","), ")",
-                        collapse = "")
-  }
-  aes_mapping <- aes_string(x = "group", y = y_val,  color = prac_vars, group = prac_vars)
-
-  # Basic Plot
-  p <- ggplot(data = data, mapping = aes_mapping) +
-    geom_point(size=2) +
-    geom_line(size=.75) +
-    scale_x_discrete("Group",expand=c(0,.35),
-                     limits = c("immediate", "delay"),
-                     labels=c("Immediate","Delay")) +
-    theme(legend.key.height = unit(2,"line")) +
-    y_axis
-
-  if (any(grepl("practice[0-9]+acc", names(data)))) {
-    # apply(permutations(2,2, c(0,1), repeats.allowed = TRUE), 1, paste0, collapse = ".")
-    p <- p + scale_color_discrete("Practice\nAccuracy",
-                                  breaks = c("0", "1", "0.0", "0.1", "1.0", "1.1"),
-                                  labels = c("0"="Inc", "1"="Cor",
-                                             "0.0"="Inc,Inc", "0.1"="Inc,Cor",
-                                             "1.0"= "Cor,Inc", "1.1"="Cor,Cor")) +
-      ggtitle('Final Test Condtional')
-  } else if ( is.element("OCpractice", names(data)) ) {
-    p <- p + scale_color_discrete("Practice\nCondition",
-                                  breaks = c("N.N","N.S","N.T","S.N","T.N"),
-                                  labels = c(N.N = "Baseline", N.S ="Other Cue Study",
-                                             S.N = "Other Cue Study", N.T = "Other Cue Test",
-                                             T.N = "Same Cue Test")) +
-      ggtitle('Final Test')
-  }
-
-  ## Faceting
-  facet_vars <- paste(intersect("sameCue", names(data)),
-                      intersect("final_acc", names(data)),
-                      collapse = "", sep = "~")
-  if (facet_vars != "") {
-    if (grepl("~$", facet_vars)) {
-      facet_vars <- paste0("~", gsub("~$", "", facet_vars))
-    }
-    p <- p + facet_grid(facet_vars, labeller = labels_fun)
-  }
-
-  if (!("subject" %in% names(data))) {
-    err_val <- grep_for_error(DV, names(data))
-    vals <- list(x = as.name(y_val), y = as.name(err_val))
-    data %<>% mutate_(upper = interp(~ x + y, .values = vals),
-                      lower = interp(~ x - y, .values = vals))
-    p <- p + geom_errorbar(aes(ymax = upper, ymin = lower),
-                           data = data, width = .025)
-  }
+  y_vars <- list(accuracy = list(name = "mean_p",  ylabel = "Recall Accuracy", lim = 0:1),
+                 RT = list(name = "mean_RT", ylabel = "Average Median RT", lim = c(0,6)))
+  p <- LB4L_plotbuilder(data, y_vars[[DV]]$name) +
+    scale_color_discrete("Practice\nCondition",
+                         breaks = c("N.N","N.S","N.T","S.N","T.N"),
+                         labels = c(N.N = "Baseline", N.S ="Other Cue Study",
+                                    S.N = "Same Cue Study", N.T = "Other Cue Test",
+                                    T.N = "Same Cue Test")) +
+    scale_y_continuous(y_vars[[DV]]$ylabel, limits = y_vars[[DV]]$lim) +
+    ggtitle(paste('Final Test', DV))
   return(p)
 }
 
@@ -274,22 +209,78 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy", joint = FALSE) {
 #'
 #' @param data An LB4L2_IV_summary data frame from the FAM package.
 #' @export
-autoplot.LB4L_CD_summary <- function(data, DV = "accuracy", joint = TRUE) {
-  p <- autoplot.LB4L_IV_summary(data,DV,joint)
+autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
+
+  y_vars <- list(joint_p = list(accuracy = list(name = "joint_p",
+                                                y = scale_y_continuous("Joint Accuracy", limits = c(-.05,1))),
+                                RT = list(name = "mean_RT",
+                                          y = scale_y_continuous("Joint RT"))),
+                 conditional_p = list(accuracy = list(name = "conditional_p",
+                                                      y = scale_y_continuous("Conditional Accuracy")),
+                                      RT = list(name = "mean_RT",
+                                                y = scale_y_continuous("Conditional RT"))))
+  var <- intersect(c("conditional_p", "joint_p"), names(data))
+
+  p <- LB4L_plotbuilder(data, y_vars[[var]][[DV]]$name) +
+    scale_color_discrete("Same Cue",
+                         breaks = c("yes", "no"),
+                         labels = c("yes" = "Yes", "no" = "No")) +
+    y_vars[[var]][[DV]]$y +
+    ggtitle(paste("Practice & Final Test", DV))
   return(p)
 }
 
 #' @export
-autoplot.LB4L_joint_summary <- function(data, DV = "accuracy", joint = TRUE) {
-  p <- autoplot.LB4L_IV_summary(data,DV)
-  return(p)
+autoplot.LB4L_joint_summary <- function(data, DV = "accuracy") {
+
 }
 
-#'
-grep_for_y <- function(DV, variables) {
-  y_val <- grep(paste0('^', DV, '(?!_sd)'), variables,
-                value = TRUE, perl = TRUE, ignore.case = TRUE)
+LB4L_plotbuilder <- function(data, DV) {
+
+  if (DV %in% c("mean_p", "conditional_p")) {
+    data %<>% filter(final_acc == 1)  %>% select(-final_acc)
+  }
+  vars <- names(data)
+  lookup_table <- c("0" = "Incorrect", "1" = "Correct")
+  labels_fun <- labeller(practice1acc = setNames(paste("Practice Test", lookup_table), names(lookup_table)),
+                         practice2acc = setNames(paste("Practice Test 2", lookup_table), names(lookup_table)),
+                         final_acc = setNames(paste("Final Test", lookup_table), names(lookup_table)))
+
+  color_vars <- intersect(c("practice","OCpractice","sameCue"), vars)
+  if (length(color_vars) > 1) {
+    color_vars <- paste0("interaction(", paste0(color_vars, collapse = ","), ")",
+                        collapse = "")
+  }
+
+  facet_vars <- paste(grep("^practice[0-9]acc$", names(data), value = TRUE),
+                      intersect("final_acc", names(data)),
+                      collapse = "+", sep = "~")
+
+  p <- ggplot(data, aes_string(x = "group", y = DV, color = color_vars, group = color_vars)) +
+    geom_point(size=2) +
+    geom_line(size=.75) +
+    scale_x_discrete("Group",expand=c(0,.35),
+                     limits = c("immediate", "delay"),
+                     labels=c("Immediate","Delay")) +
+    theme(legend.key.height = unit(2,"line"))
+
+  if (facet_vars != "") {
+    if (grepl("~$", facet_vars)) {
+      facet_vars <- paste0("~", gsub("~$", "", facet_vars))
+    }
+    p <- p + facet_grid(facet_vars, labeller = labels_fun)
+  }
+
+  if (!("subject" %in% vars)) {
+    err_val <- paste0("sem_",strsplit(DV, "_")[[1]][2])
+    vals <- list(x = as.name(DV), y = as.name(err_val))
+    data %<>% mutate_(upper = interp(~ x + y, .values = vals),
+                      lower = interp(~ x - y, .values = vals))
+    p <- p + geom_errorbar(aes(ymax = upper, ymin = lower),
+                           data = data, width = .025)
+  }
 }
+
 #'
 grep_for_error <- function(DV, variables) {
   table <- c("probability" = "acc", "RT" = "RT")
