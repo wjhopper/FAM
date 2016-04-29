@@ -71,6 +71,7 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
     }
   }
 
+  include <- character(0)
   if (!is.null(given_data)) {
     data <- ungroup(data) %>%
       select(subject:target, final_acc, final_RT) %>%
@@ -78,6 +79,15 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
                 y = ., by = c("subject", "group", "list", "target")) %>%
       select(subject:list, pracCue = cue.x, finalCue = cue.y,
              target, sameCue, starts_with("practice"), final_acc, final_RT)
+
+    if (conditional) {
+      DVname <- "conditional_p"
+      include <- grep("^practice[0-9]acc", names(data), value = TRUE)
+    }  else {
+      DVname <- "joint_p"
+    }
+  } else {
+    DVname <- "mean_p"
   }
 
   if (level == "raw") {
@@ -86,16 +96,11 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
 
   orig_groups <- sapply(groups(data), as.character)
   new_groups <- grep("acc$", names(data), value = TRUE)
-  all_groups <- c(orig_groups, new_groups)
+  all_groups <- n_grouping <- c(orig_groups, new_groups)
   fill_vars <- grep("\\w*practice$|group", all_groups, value=TRUE, invert=TRUE)
-  if (conditional) {
-    n_grouping <- all_groups[!grepl("final", all_groups)]
-  } else {
-    n_grouping <- c(orig_groups)
-  }
 
-  possible_n <- summarise(group_by_(data, .dots = n_grouping),
-                          cell_max = n())
+  possible_n <- group_by_(data, .dots = c(orig_groups, include)) %>%
+    summarise(cell_max = n())
   fill_frame <- do.call(expand.grid, c(lapply(data[,fill_vars],  unique),
                                        list(stringsAsFactors = FALSE))) %>%
     left_join(distinct(select(ungroup(possible_n),subject,group)), by="subject") %>%
@@ -110,37 +115,40 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
   summarized_data <- data %>%
     group_by_(.dots = new_groups, add = TRUE) %>%
     summarise_(freq = ~n(),
-              RT = ~median(final_RT, na.rm = TRUE),
-              nRT = ~sum(!is.na(final_RT)),
-              .dots = prac_RT_funs) %>%
+               RT = ~median(final_RT, na.rm = TRUE),
+               nRT = ~sum(!is.na(final_RT)),
+               .dots = prac_RT_funs) %>%
     right_join(y = fill_frame, by = intersect(names(.), names(fill_frame))) %>%
     ungroup() %>%
     mutate(freq = ifelse(is.na(freq) & !is.na(cell_max), 0, freq),
-           probability = ifelse(is.na(freq), NA_real_, freq/cell_max))
+           p = ifelse(is.na(freq), NA_real_, freq/cell_max))
 
   if (level == "group") {
-    # prac_RT_funs <- lapply(prac_RTcols, function(x) {
-    #   as.formula(paste0("~mean(", x, ")"))
-    # }) %>%
-    #   setNames(prac_RTcols)
     summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"])
     N <- summarise(summarized_data,
                    nObs = sum(freq, na.rm=TRUE),
                    nRT = sum(nRT, na.rm=TRUE),
                    N = n())
     summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"]) %>%
-      summarise_each(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)),
-                     probability, RT) %>%
+      summarise_each(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)), p, RT) %>%
       left_join(N, by = intersect(names(.), names(N))) %>%
-      mutate(sem_acc = sqrt(probability_sd)/sqrt(N),
-             sem_RT = sqrt(RT_sd)/sqrt(N))
+      mutate(sem_p = sqrt(p_sd)/sqrt(N),
+             sem_RT = sqrt(RT_sd)/sqrt(N)) %>%
+      ungroup()
   }
 
-  conditions <- sum(grepl("practice[0-9]+", names(summarized_data)))
+  DVcols <- grep("^p(?:_)", names(summarized_data), value = TRUE, perl = TRUE)
+  newDVcols <- sapply(strsplit(DVcols, "_"), function(x) paste(rev(x), collapse = "_"))
+  newDVcols[grepl("^mean|^p$", newDVcols)] <- DVname
+  RTcols <- grep("^RT", names(summarized_data), value = TRUE)
+  newRTcols <- sapply(strsplit(RTcols, "_"), function(x) paste(rev(x), collapse = "_"))
+
+  summarized_data %<>% rename_(.dots = setNames(c(DVcols, RTcols), c(newDVcols,  newRTcols)))
+  conditions <- sum(grepl("^practice[0-9]+", names(summarized_data)))
   if (conditions >= 1) {
-    summarized_data <- as_LB4L_CD_summary(ungroup(summarized_data))
+    summarized_data %<>% as_LB4L_CD_summary()
   } else {
-    summarized_data <- as_LB4L_IV_summary(ungroup(summarized_data))
+    summarized_data %<>%  as_LB4L_IV_summary()
   }
 
   return(summarized_data)
