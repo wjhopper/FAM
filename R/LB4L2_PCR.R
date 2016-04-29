@@ -255,6 +255,7 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
   if (likelihood %in% c("all","accuracy")) {
     multinomial_lik <- select(joint, -contains("RT")) %>%
       spread(type, acc) %>%
+      mutate(pred = replace(pred, pred==0, .Machine$double.xmin)) %>%
       with(multinomialLL(obs, pred, N = 20))
     error <- error + multinomial_lik
   }
