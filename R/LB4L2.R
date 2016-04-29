@@ -52,11 +52,19 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
   data <- rename(data, final_acc = acc, final_RT = RT)
 
   if (any(given_practice > 0)) {
+
     if (is.null(given_data)) {
       given_data <- get(attr(data,"tables")$test_practice)
     }
+
     if (is.numeric(given_practice)) {
-      rounds <- 1:attr(data,"practice_tests")
+
+      if ("round" %in% names(given_data)) {
+        rounds <- unique(given_data$round)
+      } else {
+        given_data$round <- rounds <- 1
+      }
+
       if (!setequal(given_practice, rounds)) {
         given_data <- filter(given_data, round %in% given_practice)
       }
