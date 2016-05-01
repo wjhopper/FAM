@@ -182,7 +182,7 @@ fitPCR <- function(free_parameters, PCRparams_obj, objective_fcn, error_fcn, ...
   }
 
   error <- error_fcn(results, ...)
-  return(error)
+  return(error$error)
 
 }
 
@@ -206,7 +206,6 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
 
   likelihood <- match.arg(likelihood,  c("RT","accuracy","all"))
   error <- 0
-
 
   IV_pred <- results$final %>%
     filter(practice != "T", OCpractice != "T", accuracy == 1) %>%
@@ -284,6 +283,13 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
     joint_RT_lik <- sum(-log(joint_density$density))
     error <- error + joint_RT_lik
   }
-  return(error)
+
+  if (likelihood %in% c("all","RT")) {
+    return_data <- list(error = error, IV = list(IV, IV_density), Joint = list(joint, joint_density))
+  } else {
+    return_data <- list(error = error, IV = IV, Joint = joint)
+  }
+
+  return(return_data)
 }
 
