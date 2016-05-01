@@ -200,8 +200,8 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
                          labels = c(N.N = "Baseline", N.S ="Other Cue Study",
                                     S.N = "Same Cue Study", N.T = "Other Cue Test",
                                     T.N = "Same Cue Test")) +
-    scale_y_continuous(y_vars[[DV]]$ylabel, limits = y_vars[[DV]]$lim)
-    ggtitle('Final Test')
+    scale_y_continuous(y_vars[[DV]]$ylabel, limits = y_vars[[DV]]$lim) +
+    ggtitle(paste('Final Test', DV))
   return(p)
 }
 
@@ -212,25 +212,22 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
 autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
 
   y_vars <- list(joint_p = list(accuracy = list(name = "joint_p",
-                                                ylabel = "Joint Accuracy"),
+                                                y = scale_y_continuous("Joint Accuracy", limits = c(-.05,1))),
                                 RT = list(name = "mean_RT",
-                                          ylabel = "Joint RT")),
+                                          y = scale_y_continuous("Joint RT"))),
                  conditional_p = list(accuracy = list(name = "conditional_p",
-                                                      ylabel = "Conditional Accuracy"),
+                                                      y = scale_y_continuous("Conditional Accuracy")),
                                       RT = list(name = "mean_RT",
-                                                ylabel = "Conditional RT")))
+                                                y = scale_y_continuous("Conditional RT"))))
   var <- intersect(c("conditional_p", "joint_p"), names(data))
 
   p <- LB4L_plotbuilder(data, y_vars[[var]][[DV]]$name) +
     scale_color_discrete("Same Cue",
                          breaks = c("yes", "no"),
                          labels = c("yes" = "Yes", "no" = "No")) +
+    y_vars[[var]][[DV]]$y +
     ggtitle(paste("Practice & Final Test", DV))
-  if (DV == "accuracy") {
-    return(p + scale_y_continuous(y_vars[[var]][[DV]]$name, limits = c(0,1)))
-  } else {
-    return(p + scale_y_continuous(y_vars[[var]][[DV]]$name, limits = c(0,5)))
-  }
+  return(p)
 }
 
 #' @export
@@ -244,7 +241,7 @@ LB4L_plotbuilder <- function(data, DV) {
     data %<>% filter(final_acc == 1)  %>% select(-final_acc)
   }
   vars <- names(data)
-  lookup_table <- c("0" = "Incorect", "1" = "Correct")
+  lookup_table <- c("0" = "Incorrect", "1" = "Correct")
   labels_fun <- labeller(practice1acc = setNames(paste("Practice Test", lookup_table), names(lookup_table)),
                          practice2acc = setNames(paste("Practice Test 2", lookup_table), names(lookup_table)),
                          final_acc = setNames(paste("Final Test", lookup_table), names(lookup_table)))
