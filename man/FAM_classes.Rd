@@ -4,28 +4,29 @@
 \alias{FAM_classes}
 \alias{as_LB4L}
 \alias{as_LB4L_CD_summary}
-\alias{as_LB4L_IV_summary}
-\alias{as_LB4L_joint_summary}
-\alias{is.LB4L2}
-\alias{is.LB4L2_CD_summary}
-\alias{is.LB4L2_IV_summary}
-\title{FAM classes}
+\alias{as_LB4L_summary}
+\alias{is.LB4L}
+\alias{is.LB4L_CD_summary}
+\alias{is.LB4L_summary}
+\title{grep_for_error <- function(DV, variables) {
+  table <- c("probability" = "acc", "RT" = "RT")
+  grep(paste0('^sem_', table[DV]), variables,
+       value = TRUE, perl = TRUE, ignore.case = TRUE)
+}}
 \usage{
 as_LB4L(data, tables = attr(data, "tables"), IDvars = vapply(groups(data),
   as.character, character(1L)), experiment = attr(data, "experiment"),
   practice_tests = attr(data, "practice_tests"))
 
-as_LB4L_IV_summary(data, ...)
+as_LB4L_summary(data, ...)
 
 as_LB4L_CD_summary(data, ...)
 
-as_LB4L_joint_summary(data, ...)
+is.LB4L(x)
 
-is.LB4L2(x)
+is.LB4L_summary(x)
 
-is.LB4L2_IV_summary(x)
-
-is.LB4L2_CD_summary(x)
+is.LB4L_CD_summary(x)
 }
 \arguments{
 \item{data}{An R object that is, or can be coerced to, a data frame.}
@@ -59,6 +60,12 @@ specific class (i.e.,\code{LB4L_IV}, \code{LB4L_IV_summary}, etc.) as it's
 first value of the \code{class} attribute.
 }
 \description{
+grep_for_error <- function(DV, variables) {
+  table <- c("probability" = "acc", "RT" = "RT")
+  grep(paste0('^sem_', table[DV]), variables,
+       value = TRUE, perl = TRUE, ignore.case = TRUE)
+}
+
 FAM provides these helper functions to construct objects belonging to S3 classes
 from the \code{\link{FAM}} package, or to quickly check if an R object
 inhereits from one of the FAM package's classes.
@@ -73,20 +80,18 @@ of the S3 classes implemented by the \code{\link{FAM}} package.
 \itemize{
 \item \code{as_LB4L}: Creates a data frame with the primary class "LB4L"
 
-\item \code{as_LB4L_IV_summary}: Creates a data frame with the primary class "LB4L_IV_summary"
+\item \code{as_LB4L_summary}: Creates a data frame with the primary class "LB4L_summary"
 
 \item \code{as_LB4L_CD_summary}: Creates a data frame with the primary class "LB4L_CD_summary"
 
-\item \code{as_LB4L_joint_summary}: Creates a data frame with the primary class "LB4L_joint_summary"
-
-\item \code{is.LB4L2}: Checks if an R object has \code{LB4L_IV} as it's
+\item \code{is.LB4L}: Checks if an R object has \code{LB4L} as it's
 first value of the \code{class} attribute.
 
-\item \code{is.LB4L2_IV_summary}: Checks if an R object has \code{LB4L_IV_summary} as it's
+\item \code{is.LB4L_summary}: Checks if an R object has \code{LB4L_summary} as it's
 first value of the \code{class} attribute.
 #' @export
 
-\item \code{is.LB4L2_CD_summary}: Checks if an R object has \code{LB4L_IV_summary} as it's
+\item \code{is.LB4L_CD_summary}: Checks if an R object has \code{LB4L_CD_summary} as it's
 first value of the \code{class} attribute.
 #' @export
 }}

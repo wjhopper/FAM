@@ -148,7 +148,7 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
   if (conditions >= 1) {
     summarized_data %<>% as_LB4L_CD_summary()
   } else {
-    summarized_data %<>%  as_LB4L_IV_summary()
+    summarized_data %<>%  as_LB4L_summary()
   }
 
   return(summarized_data)
@@ -185,12 +185,12 @@ reshaping <- function(long_data) {
 
 #' Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
 #'
-#' @param data An LB4L2_IV_summary data frame from the FAM package.
+#' @param data An LB4L2_summary data frame from the FAM package.
 #' @param DV A character vector specifying which DV to plot, \code{"accuracy"} or
 #' \code{"RT"}
 #' @importFrom lazyeval interp
 #' @export
-autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
+autoplot.LB4L_summary <- function(data, DV = "accuracy") {
 
   y_vars <- list(accuracy = list(name = "mean_p",  ylabel = "Recall Accuracy", lim = 0:1),
                  RT = list(name = "mean_RT", ylabel = "Average Median RT", lim = c(0,6)))
@@ -207,7 +207,7 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
 
 #' Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
 #'
-#' @param data An LB4L2_IV_summary data frame from the FAM package.
+#' @param data An LB4L2_CD_summary data frame from the FAM package.
 #' @export
 autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
 
@@ -228,11 +228,6 @@ autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
     y_vars[[var]][[DV]]$y +
     ggtitle(paste("Practice & Final Test", DV))
   return(p)
-}
-
-#' @export
-autoplot.LB4L_joint_summary <- function(data, DV = "accuracy") {
-
 }
 
 LB4L_plotbuilder <- function(data, DV) {
@@ -280,13 +275,13 @@ LB4L_plotbuilder <- function(data, DV) {
                            data = data, width = .025)
   }
 }
-
 #'
-grep_for_error <- function(DV, variables) {
-  table <- c("probability" = "acc", "RT" = "RT")
-  grep(paste0('^sem_', table[DV]), variables,
-       value = TRUE, perl = TRUE, ignore.case = TRUE)
-}
+#'
+#' grep_for_error <- function(DV, variables) {
+#'   table <- c("probability" = "acc", "RT" = "RT")
+#'   grep(paste0('^sem_', table[DV]), variables,
+#'        value = TRUE, perl = TRUE, ignore.case = TRUE)
+#' }
 
 #' @describeIn FAM_classes Creates a data frame with the primary class "LB4L"
 #'
@@ -314,10 +309,10 @@ as_LB4L <- function(data, tables = attr(data, "tables"),
   return(data)
 }
 
-#' @describeIn FAM_classes Creates a data frame with the primary class "LB4L_IV_summary"
+#' @describeIn FAM_classes Creates a data frame with the primary class "LB4L_summary"
 #' @export
-as_LB4L_IV_summary <- function(data, ...) {
-  class(data) <- c("LB4L_IV_summary", class(data))
+as_LB4L_summary <- function(data, ...) {
+  class(data) <- c("LB4L_summary", class(data))
   return(data)
 }
 
@@ -328,31 +323,24 @@ as_LB4L_CD_summary <- function(data, ...) {
   return(data)
 }
 
-#' @describeIn FAM_classes Creates a data frame with the primary class "LB4L_joint_summary"
-#' @export
-as_LB4L_joint_summary <- function(data, ...) {
-  class(data) <- c("LB4L_joint_summary", class(data))
-  return(data)
-}
-
-#' @describeIn FAM_classes Checks if an R object has \code{LB4L_IV} as it's
+#' @describeIn FAM_classes Checks if an R object has \code{LB4L} as it's
 #' first value of the \code{class} attribute.
 #' @export
-is.LB4L2 <- function(x) {
+is.LB4L <- function(x) {
   return("LB4L" %in% class(x)[1])
 }
 
-#'@describeIn FAM_classes Checks if an R object has \code{LB4L_IV_summary} as it's
+#'@describeIn FAM_classes Checks if an R object has \code{LB4L_summary} as it's
 #' first value of the \code{class} attribute.
 #' #' @export
-is.LB4L2_IV_summary <- function(x) {
-  return("LB4L_IV_summary" %in% class(x)[1])
+is.LB4L_summary <- function(x) {
+  return("LB4L_summary" %in% class(x)[1])
 }
 
-#'@describeIn FAM_classes Checks if an R object has \code{LB4L_IV_summary} as it's
+#'@describeIn FAM_classes Checks if an R object has \code{LB4L_CD_summary} as it's
 #' first value of the \code{class} attribute.
 #' #' @export
-is.LB4L2_CD_summary <- function(x) {
+is.LB4L_CD_summary <- function(x) {
   return("LB4L_CD_summary" %in% class(x)[1])
 }
 
