@@ -274,6 +274,8 @@ LB4L_plotbuilder <- function(data, DV) {
     p <- p + geom_errorbar(aes(ymax = upper, ymin = lower),
                            data = data, width = .025)
   }
+
+  return(p)
 }
 #'
 #'
