@@ -132,8 +132,8 @@ summary.LB4L <- function(data, level = c("subject", "group", "raw"),
     summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"]) %>%
       summarise_each(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)), p, RT) %>%
       left_join(N, by = intersect(names(.), names(N))) %>%
-      mutate(sem_p = sqrt(p_sd)/sqrt(N),
-             sem_RT = sqrt(RT_sd)/sqrt(N)) %>%
+      mutate(sem_p = p_sd/sqrt(N),
+             sem_RT = RT_sd/sqrt(N)) %>%
       ungroup()
   }
 
