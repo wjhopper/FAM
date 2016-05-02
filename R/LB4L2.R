@@ -190,11 +190,11 @@ reshaping <- function(long_data) {
 #' \code{"RT"}
 #' @importFrom lazyeval interp
 #' @export
-autoplot.LB4L_summary <- function(data, DV = "accuracy") {
+autoplot.LB4L_summary <- function(data, DV = "accuracy", ...) {
 
   y_vars <- list(accuracy = list(name = "mean_p",  ylabel = "Recall Accuracy", lim = 0:1),
                  RT = list(name = "mean_RT", ylabel = "Average Median RT", lim = c(0,6)))
-  p <- LB4L_plotbuilder(data, y_vars[[DV]]$name) +
+  p <- LB4L_plotbuilder(data, y_vars[[DV]]$name, ...) +
     scale_color_discrete("Practice\nCondition",
                          breaks = c("N.N","N.S","N.T","S.N","T.N"),
                          labels = c(N.N = "Baseline", N.S ="Other Cue Study",
@@ -209,7 +209,7 @@ autoplot.LB4L_summary <- function(data, DV = "accuracy") {
 #'
 #' @param data An LB4L2_CD_summary data frame from the FAM package.
 #' @export
-autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
+autoplot.LB4L_CD_summary <- function(data, DV = "accuracy", ...) {
 
   y_vars <- list(joint_p = list(accuracy = list(name = "joint_p",
                                                 y = scale_y_continuous("Joint Accuracy", limits = c(-.05,1))),
@@ -221,7 +221,7 @@ autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
                                                 y = scale_y_continuous("Conditional RT"))))
   var <- intersect(c("conditional_p", "joint_p"), names(data))
 
-  p <- LB4L_plotbuilder(data, y_vars[[var]][[DV]]$name) +
+  p <- LB4L_plotbuilder(data, y_vars[[var]][[DV]]$name, ...) +
     scale_color_discrete("Same Cue",
                          breaks = c("yes", "no"),
                          labels = c("yes" = "Yes", "no" = "No")) +
@@ -230,7 +230,7 @@ autoplot.LB4L_CD_summary <- function(data, DV = "accuracy") {
   return(p)
 }
 
-LB4L_plotbuilder <- function(data, DV) {
+LB4L_plotbuilder <- function(data, DV, size = 2) {
 
   if (DV %in% c("mean_p", "conditional_p")) {
     data %<>% filter(final_acc == 1)  %>% select(-final_acc)
@@ -257,8 +257,8 @@ LB4L_plotbuilder <- function(data, DV) {
 
   p <- ggplot(data, aes_string(x = "group", y = DV, color = color_vars,
                                group = color_vars, shape = NULL)) +
-    geom_point(size = 2) +
-    geom_line(size=.75) +
+    geom_point(size = size) +
+    geom_line(size= .375*size) +
     scale_x_discrete("Group",expand=c(0,.35),
                      limits = c("immediate", "delay"),
                      labels=c("Immediate","Delay")) +
@@ -277,7 +277,7 @@ LB4L_plotbuilder <- function(data, DV) {
     data %<>% mutate_(upper = interp(~ x + y, .values = vals),
                       lower = interp(~ x - y, .values = vals))
     p <- p + geom_errorbar(aes(ymax = upper, ymin = lower),
-                           data = data, width = .025)
+                           data = data, width = .05, size = .125*size)
   }
 
   return(p)
