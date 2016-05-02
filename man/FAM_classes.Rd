@@ -8,11 +8,7 @@
 \alias{is.LB4L}
 \alias{is.LB4L_CD_summary}
 \alias{is.LB4L_summary}
-\title{grep_for_error <- function(DV, variables) {
-  table <- c("probability" = "acc", "RT" = "RT")
-  grep(paste0('^sem_', table[DV]), variables,
-       value = TRUE, perl = TRUE, ignore.case = TRUE)
-}}
+\title{FAM classes}
 \usage{
 as_LB4L(data, tables = attr(data, "tables"), IDvars = vapply(groups(data),
   as.character, character(1L)), experiment = attr(data, "experiment"),
@@ -60,12 +56,6 @@ specific class (i.e.,\code{LB4L_IV}, \code{LB4L_IV_summary}, etc.) as it's
 first value of the \code{class} attribute.
 }
 \description{
-grep_for_error <- function(DV, variables) {
-  table <- c("probability" = "acc", "RT" = "RT")
-  grep(paste0('^sem_', table[DV]), variables,
-       value = TRUE, perl = TRUE, ignore.case = TRUE)
-}
-
 FAM provides these helper functions to construct objects belonging to S3 classes
 from the \code{\link{FAM}} package, or to quickly check if an R object
 inhereits from one of the FAM package's classes.

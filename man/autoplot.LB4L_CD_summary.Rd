@@ -4,7 +4,7 @@
 \alias{autoplot.LB4L_CD_summary}
 \title{Plot Accuracy or RT for each experimental condition of the LB4L2 dataset}
 \usage{
-\method{autoplot}{LB4L_CD_summary}(data, DV = "accuracy")
+\method{autoplot}{LB4L_CD_summary}(data, DV = "accuracy", ...)
 }
 \arguments{
 \item{data}{An LB4L2_CD_summary data frame from the FAM package.}
