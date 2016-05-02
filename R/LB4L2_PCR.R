@@ -227,21 +227,27 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
   }
 
   if (likelihood %in% c("all","RT")) {
-    IV_density<- select(filter(IV, type == "pred"), -mean_p, -mean_RT, -type) %>%
-      rowwise() %>%
-      mutate(KD = list(density(rawRTs, bw = 1, from = .1, to = 8, n = 80)[c("x","y")]))
-    IV_density$KD <- lapply(IV_density$KD, function(k)  {
-      data.frame(RT=round(k$x,1), density= k$y/sum(k$y))
-      })
-    IV_density <- select(IV_density, -rawRTs) %>%
-      unnest(KD)
-    uni_RT_lik <- left_join(unnest(select(filter(IV, type == "obs"),
-                                          -mean_p, -mean_RT, -type, RT = rawRTs)),
-                            IV_density,
-                            by = c("practice", "OCpractice", "RT","group"))
-    uni_RT_lik <- sum(-log(uni_RT_lik$density))
-    error <- error + uni_RT_lik
+    binom_RTerror <- select(IV,group:final_acc, mean_RT, type) %>%
+      filter(final_acc == 1) %>%
+      spread(type, mean_RT) %>%
+      with(sum((obs-pred)^2))
+    error <- error + binom_RTerror
   }
+    # IV_density<- select(filter(IV, type == "pred"), -mean_p, -mean_RT, -type) %>%
+    #   rowwise() %>%
+    #   mutate(KD = list(density(rawRTs, bw = 1, from = .1, to = 8, n = 80)[c("x","y")]))
+    # IV_density$KD <- lapply(IV_density$KD, function(k)  {
+    #   data.frame(RT=round(k$x,1), density= k$y/sum(k$y))
+    #   })
+    # IV_density <- select(IV_density, -rawRTs) %>%
+    #   unnest(KD)
+    # uni_RT_lik <- left_join(unnest(select(filter(IV_obs, final_acc==1),
+    #                                       -mean_p, -mean_RT, RT = rawRTs)),
+    #                         IV_density,
+    #                         by = c("practice", "OCpractice", "RT","group"))
+    # uni_RT_lik <- sum(-log(uni_RT_lik$density))
+    # error <- error + uni_RT_lik
+  # }
 
   joint_pred <- results$joint %>%
     select(group, sameCue, practice1acc = practice, final_acc = final,
@@ -262,31 +268,41 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
   }
 
   if (likelihood %in% c("all","RT")) {
-    x_axis_points <- expand.grid(seq(.1,8,by=.1), seq(.1,8,by=.1))
-    joint_density <- filter(joint, practice1acc == 1, final_acc ==1, type=="pred") %>%
-      select(group:final_acc, rawRTs) %>%
+    multinomial_RT <- select(joint, group:final_acc,rawRTs, type) %>%
+      filter(final_acc == 1, practice1acc ==1) %>%
       rowwise() %>%
-      mutate(KD = list(ks::kde(rawRTs, H = matrix(c(1,0,0,1),2),  binned = TRUE,
-                               eval.points = x_axis_points)))
-    joint_density$KD <- lapply(joint_density$KD, function(k){
-      data.frame(pracRT = round(k$eval.points[[1]],1),
-                 finalRT = round(k$eval.points[[2]],1),
-                 density = k$estimate/sum(k$estimate))
-      })
+      summarise(group = group, type = type, practice1acc = practice1acc, final_acc = final_acc,
+                prac = mean(rawRTs[,1]), delta = mean(rawRTs[,2] -rawRTs[,1]))
 
-    joint_density <- select(joint_density, -KD) %>%
-      rowwise() %>%
-      mutate(rawRTs = list(setNames(as.data.frame(rawRTs), c("pracRT","finalRT"))),
-             rawRTs = list(as.data.frame(lapply(rawRTs, round, 1)))) %>%
-      unnest() %>%
-      left_join(unnest(select(joint_density, -rawRTs)),
-                c("group", "sameCue", "practice1acc", "final_acc", "pracRT", "finalRT"))
-    joint_RT_lik <- sum(-log(joint_density$density))
-    error <- error + joint_RT_lik
+    error <- error + sum((multinomial_RT$prac[multinomial_RT$type == "obs"] - multinomial_RT$prac[multinomial_RT$type == "pred"])^2) +
+      sum((multinomial_RT$delta[multinomial_RT$type == "obs"] - multinomial_RT$delta[multinomial_RT$type == "pred"])^2)
+
   }
+    # x_axis_points <- expand.grid(seq(.1,8,by=.1), seq(.1,8,by=.1))
+    # joint_density <- filter(joint, practice1acc == 1, final_acc ==1, type=="pred") %>%
+    #   select(group:final_acc, rawRTs) %>%
+    #   rowwise() %>%
+    #   mutate(KD = list(ks::kde(rawRTs, H = matrix(c(1,0,0,1),2),  binned = TRUE,
+    #                            eval.points = x_axis_points)))
+    # joint_density$KD <- lapply(joint_density$KD, function(k){
+    #   data.frame(pracRT = round(k$eval.points[[1]],1),
+    #              finalRT = round(k$eval.points[[2]],1),
+    #              density = k$estimate/sum(k$estimate))
+    #   })
+    #
+    # joint_density <- select(joint_density, -KD) %>%
+    #   rowwise() %>%
+    #   mutate(rawRTs = list(setNames(as.data.frame(rawRTs), c("pracRT","finalRT"))),
+    #          rawRTs = list(as.data.frame(lapply(rawRTs, round, 1)))) %>%
+    #   unnest() %>%
+    #   left_join(unnest(select(joint_density, -rawRTs)),
+    #             c("group", "sameCue", "practice1acc", "final_acc", "pracRT", "finalRT"))
+    # joint_RT_lik <- sum(-log(joint_density$density))
+    # error <- error + joint_RT_lik
+  # }
 
   if (likelihood %in% c("all","RT")) {
-    return_data <- list(error = error, IV = list(IV, IV_density), Joint = list(joint, joint_density))
+    return_data <- list(error = error, IV = list(IV), Joint = list(joint, multinomial_RT))
   } else {
     return_data <- list(error = error, IV = IV, Joint = joint)
   }
@@ -294,3 +310,8 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
   return(return_data)
 }
 
+#' @export
+#'
+combine <- function(obj, practice = NA, final = NA, conditional = NA, joint = NA) {
+
+}
