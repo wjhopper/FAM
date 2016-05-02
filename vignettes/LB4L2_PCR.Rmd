@@ -12,9 +12,9 @@ params:
   inpar: FALSE
   routine: testing
   random_effects: FALSE
-  subset: FALSE  
+  subset: FALSE
   mode: group
-  likelihood: accuracy
+  likelihood: all
 ---
 
 ```{r setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
@@ -78,12 +78,13 @@ if (params$mode == "group") {
 ```{r model_parameters}
 acc_params <- c("ER","LR","FR","FR2","TR","TC")
 RT_params <- c("Tmin","lambda")
-theta <- list(ER=.539, LR=.15, FR=.046, FR2=.1775, TR=.015, TC = .05,
+theta <- list(ER=.539, LR=.15, FR=.03, FR2=.1775, TR=.025, TC = .113,
                    Tmax = 8, Tmin = 0.2, lambda = .25)
 parameter_sets <- switch(params$likelihood,
-                         accuracy = list(acc_params),
-                         RT = list(RT_params),
-                         all = list(acc_params, RT_params, c(acc_params, RT_params)))
+                         accuracy = list(accuracy = acc_params),
+                         RT = list(RT = RT_params),
+                         all = list(accuracy = acc_params, RT = RT_params,
+                                    all = c(acc_params, RT_params)))
 stopifnot(!is.null(parameter_sets))
 
 if (params$mode == "subject") {
@@ -217,7 +218,7 @@ param_search <- function(theta, PCR, parameter_sets) {
                     groups = globalenv()$groups, # for objective_fn
                     IV_obs = filter(IV_obs, subject == index), # for error_fcn
                     joint_obs = filter(joint_obs, subject == index), # for error_fcn
-                    likelihood = params$likelihood) # for error_fcn
+                    likelihood = names(parameter_sets[1])) # for error_fcn
   results <- cbind(results[names(results) %in% names(theta)],
                    theta[!names(theta) %in% names(results)],
                    results[!names(results) %in% names(theta)])
@@ -226,7 +227,7 @@ param_search <- function(theta, PCR, parameter_sets) {
   while (done < length(parameter_sets)) {
     new <- as.list(as.data.frame(results[done, names(results) %in% names(theta)]))
     PCR = update(PCR, new)
-    next_results <- param_search(theta, PCR, parameter_sets[done+1])
+    next_results <- param_search(PCR$params, PCR, parameter_sets[done+1])
     results <- rbind(results, next_results)
     done <- done + 1
   }
