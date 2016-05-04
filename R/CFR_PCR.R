@@ -37,7 +37,7 @@ CFR_PCR <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda
 
   binomVAR <- p['nFeat']*p['ER']*(1-p['ER'])
   binomM <- p['nFeat']*p['ER']
-  beta_pars = betaABfromMeanSD(mean = binomM/p['nFeat'],
+  beta_pars = betaParams(mean = binomM/p['nFeat'],
                                sd = sqrt(binomVAR/p['nFeat']^2))
   mem <- matrix(rbeta(mxn, beta_pars$a, beta_pars$b),
                 nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
