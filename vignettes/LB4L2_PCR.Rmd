@@ -78,8 +78,8 @@ if (params$mode == "group") {
 ```{r model_parameters}
 acc_params <- c("ER","LR","FR","FR2","TR","TC")
 RT_params <- c("Tmin","lambda")
-theta <- list(ER=.539, LR=.15, FR=.03, FR2=.1775, TR=.025, TC = .113,
-                   Tmax = 8, Tmin = 0.2, lambda = .25)
+theta <- list(ER=0.53086, LR=0.14026, FR=0.032164, FR2=0.17473, TR=0.042927, TC=0.15187,
+              lambda = .29, Tmax=6.25, Tmin=1.1)
 parameter_sets <- switch(params$likelihood,
                          accuracy = list(accuracy = acc_params),
                          RT = list(RT = RT_params),
