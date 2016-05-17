@@ -198,27 +198,35 @@ if (params$subset != FALSE && is.numeric(params$subet)) {
   subs <- subs[subs %in% params$subset]
 }
 
-if (params$routine =="minimize") {
-  iterations <- 1000
-} else {
-  iterations <- 1
-}
 
 param_search <- function(theta, PCR, parameter_sets) {
 
-  index = globalenv()$j
-  results <- optimx(par = unlist(theta[ parameter_sets[[1]] ]), 
-                    fn = fitPCR,
-                    method="Nelder-Mead",
-                    itnmax = globalenv()$iterations,
-                    control = list(kkt=FALSE),
-                    PCRparams_obj = PCR, # for fn
-                    objective_fcn = LB4L2_PCR, # for fn
-                    error_fcn = LB4L2_PCR_erf,# for fn
+  index <- globalenv()$j
+  p <-unlist(theta[parameter_sets[[1]]])
+  
+  if (params$routine =="minimize") {
+    results <- optimx(par = p,
+                      fn = fitPCR,
+                      method="Nelder-Mead",
+                      itnmax = 1000,
+                      control = list(kkt=FALSE),
+                      PCRparams_obj = PCR, # for fn
+                      objective_fcn = LB4L2_PCR, # for fn
+                      error_fcn = LB4L2_PCR_erf,# for fn
+                      groups = globalenv()$groups, # for objective_fn
+                      IV_obs = filter(IV_obs, subject == index), # for error_fcn
+                      joint_obs = filter(joint_obs, subject == index), # for error_fcn
+                      likelihood = names(parameter_sets[1]))
+  } else {
+    error <- fitPCR(free_parameters = p, PCRparams_obj = PCR,
+                    objective_fcn = LB4L2_PCR, error_fcn = LB4L2_PCR_erf,
                     groups = globalenv()$groups, # for objective_fn
                     IV_obs = filter(IV_obs, subject == index), # for error_fcn
                     joint_obs = filter(joint_obs, subject == index), # for error_fcn
                     likelihood = names(parameter_sets[1])) # for error_fcn
+    results <- as.data.frame(as.list(c(p, value = error)))
+  }
+
   results <- cbind(results[names(results) %in% names(theta)],
                    theta[!names(theta) %in% names(results)],
                    results[!names(results) %in% names(theta)])
