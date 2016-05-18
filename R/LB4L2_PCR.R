@@ -227,27 +227,36 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
   }
 
   if (likelihood %in% c("all","RT")) {
-    binom_RTerror <- select(IV,group:final_acc, mean_RT, type) %>%
-      filter(final_acc == 1) %>%
-      spread(type, mean_RT) %>%
-      with(sum((obs-pred)^2))
-    error <- error + binom_RTerror
+    exp_density <- data.frame(time = seq(0, 8, by = .1)) %>%
+      mutate(density = dexp(time, rate = 1))
+
+    base <- filter(IV, type == "pred", final_acc ==1,
+                         (practice != "T" & OCpractice != "T")) %>%
+      select(-mean_p, -mean_RT, -type) %>%
+      unnest() %>%
+      rowwise()
+
+    p_complete <- base %>%
+      mutate(prob = pexp(8 - rawRTs, rate = 1)) %>%
+      group_by_(.dots = setdiff(names(.),c("rawRTs", "prob"))) %>%
+      summarise(p_complete = mean(prob))
+
+    IV_RT_density <- base %>%
+      do({
+        times <- exp_density$time >= .$rawRTs
+        data.frame(.[c("group","practice","OCpractice","final_acc","subject")],
+                   time = exp_density$time[times],
+                   density = exp_density$density[1:(nrow(exp_density) - sum(!times))])
+      }) %>%
+      group_by_(.dots = setdiff(names(.), "density")) %>%
+      summarise(density = sum(density)) %>%
+      mutate(density = (density/(sum(density))),
+             time = round(time,1)) %>%
+      right_join(unnest(select(filter(IV, type == "obs", final_acc ==1,
+                              (practice != "T" & OCpractice != "T")),
+                              -mean_p, -mean_RT, -type, time = rawRTs)))
+
   }
-    # IV_density<- select(filter(IV, type == "pred"), -mean_p, -mean_RT, -type) %>%
-    #   rowwise() %>%
-    #   mutate(KD = list(density(rawRTs, bw = 1, from = .1, to = 8, n = 80)[c("x","y")]))
-    # IV_density$KD <- lapply(IV_density$KD, function(k)  {
-    #   data.frame(RT=round(k$x,1), density= k$y/sum(k$y))
-    #   })
-    # IV_density <- select(IV_density, -rawRTs) %>%
-    #   unnest(KD)
-    # uni_RT_lik <- left_join(unnest(select(filter(IV_obs, final_acc==1),
-    #                                       -mean_p, -mean_RT, RT = rawRTs)),
-    #                         IV_density,
-    #                         by = c("practice", "OCpractice", "RT","group"))
-    # uni_RT_lik <- sum(-log(uni_RT_lik$density))
-    # error <- error + uni_RT_lik
-  # }
 
   joint_pred <- results$joint %>%
     select(group, sameCue, practice1acc = practice, final_acc = final,
