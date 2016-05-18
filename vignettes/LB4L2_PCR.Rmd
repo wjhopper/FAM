@@ -37,9 +37,9 @@ library(doParallel)
 
 ```{r data}
 final <- LB4L2_final %>%
-  mutate(acc = ifelse((RT < .2 & !is.na(RT)) | (RT > 8  & !is.na(RT)), 0, acc))
+  mutate(acc = ifelse((RT < .2 | RT > 8 ) & !is.na(RT), 0, acc))
 practice <- LB4L2_tp %>%
-  mutate(acc = ifelse((RT < .2 & !is.na(RT)) | (RT > 8  & !is.na(RT)), 0, acc))
+  mutate(acc = ifelse((RT < .2 | RT > 8 ) & !is.na(RT), 0, acc))
 
 IV_summary <- summary(final, level = params$mode)
 
