@@ -209,114 +209,97 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
 
   IV_pred <- results$final %>%
     select(group, practice, OCpractice, final_acc = accuracy,
-           mean_p = proportion, mean_RT = medianRT, rawRTs = rawRTs) %>%
-    rowwise() %>%
-    mutate(rawRTs = list(round(rawRTs,1)),
-           group = if(group == "group1") {"immediate"} else {"delay"})
+           mean_p = proportion, mean_RT = medianRT, rawRTs) %>%
+    mutate(group = ifelse(group == "group1", "immediate", "delay"))
 
+  IV_RT <- inner_join(select(IV_obs, group:final_acc, rawRTs, subject),
+                      select(IV_pred, group:final_acc, rawRTs),
+                      by = c("group", "practice", "OCpractice", "final_acc")) %>%
+    rename(obs = rawRTs.x, pred = rawRTs.y)
 
-  IV <- bind_rows(mutate(IV_obs, type = "obs"),
-                  mutate(IV_pred, type = "pred", subject = IV_obs$subject[1]))
+  p_complete <- IV_RT %>%
+    select(-obs) %>%
+    filter(final_acc == 1) %>%
+    group_by_(.dots = setdiff(names(.), "pred")) %>%
+    summarise(p_complete =  mean(pexp(8 - pred[[1]], rate = 1)))
+
+  IV_acc <- inner_join(select(IV_obs, group:mean_p, subject),
+                       select(IV_pred, group:mean_p),
+                       by = c("group", "practice", "OCpractice", "final_acc")) %>%
+    rename(obs = mean_p.x, pred = mean_p.y) %>%
+    left_join(p_complete, by = c("group","practice","OCpractice","final_acc","subject")) %>%
+    mutate(pred = pred * p_complete)
 
   if (likelihood %in% c("all","accuracy")) {
-    binom_lik <- select(IV,group:mean_p,type) %>%
-      filter(final_acc == 1) %>%
-      spread(type, mean_p) %>%
+    IV_acc_lik <- IV_acc %>%
+      filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
       with(binomialLL(obs = obs, pred = pred, N = 20))
-    error <- error + binom_lik
+    error <- error + IV_acc_lik
   }
 
   if (likelihood %in% c("all","RT")) {
-    exp_density <- data.frame(time = seq(0, 8, by = .1)) %>%
-      mutate(density = dexp(time, rate = 1))
-
-    base <- filter(IV, type == "pred", final_acc ==1,
-                         (practice != "T" & OCpractice != "T")) %>%
-      select(-mean_p, -mean_RT, -type) %>%
-      unnest() %>%
-      rowwise()
-
-    p_complete <- base %>%
-      mutate(prob = pexp(8 - rawRTs, rate = 1)) %>%
-      group_by_(.dots = setdiff(names(.),c("rawRTs", "prob"))) %>%
-      summarise(p_complete = mean(prob))
-
-    IV_RT_density <- base %>%
-      do({
-        times <- exp_density$time >= .$rawRTs
-        data.frame(.[c("group","practice","OCpractice","final_acc","subject")],
-                   time = exp_density$time[times],
-                   density = exp_density$density[1:(nrow(exp_density) - sum(!times))])
-      }) %>%
-      group_by_(.dots = setdiff(names(.), "density")) %>%
-      summarise(density = sum(density)) %>%
-      mutate(density = (density/(sum(density))),
-             time = round(time,1)) %>%
-      right_join(unnest(select(filter(IV, type == "obs", final_acc ==1,
-                              (practice != "T" & OCpractice != "T")),
-                              -mean_p, -mean_RT, -type, time = rawRTs)))
-
+    IV_RT_lik <- IV_RT %>%
+      filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
+      rowwise() %>%
+      mutate(lik = list(sapply(obs,
+                               function(x,y) { sum(dexp(Filter(function(z) {z>=0}, x-y))) },
+                               y=pred)))
+    error <- error + sum(unlist(IV_RT_lik$lik))
   }
 
-  joint_pred <- results$joint %>%
+  ## joint probabilities section ##
+  conditional_vars <- grep("*acc$", names(joint_obs), value=TRUE)
+
+  J_pred <- results$joint %>%
     select(group, sameCue, practice1acc = practice, final_acc = final,
            joint_p = probability, rawRTs = raw_joint_RTs) %>%
-    arrange(sameCue, practice1acc, final_acc) %>%
-    rowwise() %>%
-    mutate(group = if(group == "group1") {"immediate"} else {"delay"})
+    mutate(group = ifelse(group == "group1", "immediate", "delay"))
 
-  joint <- bind_rows(mutate(joint_obs, type = "obs"),
-                     mutate(joint_pred, type = "pred", subject = joint_obs$subject[1]))
+  J_RT <- inner_join(select(joint_obs, group:final_acc, rawRTs, subject),
+                     select(J_pred, group:final_acc, rawRTs),
+                     by = c("group","sameCue", conditional_vars)) %>%
+    rename(obs = rawRTs.x, pred = rawRTs.y)
+
+  # This finds the probability that each RT from the [correct, correct] condition
+  # completes in 8 seconds. Then it multiplies those two together for the joint probability
+  # that they both complete in less than 8 seconds. Those probabilities are then averaged.
+  p_complete <- J_RT %>%
+    select(-obs) %>%
+    filter(!is.null(pred)) %>%
+    group_by_(.dots = setdiff(names(.), "pred")) %>%
+    summarise(p_complete =  mean(apply((pexp(8 - pred[[1]])),1,prod)))
+
+  J_acc <- inner_join(select(joint_obs, group:joint_p, subject),
+                      select(J_pred, group:joint_p),
+                      by = c("group","sameCue", conditional_vars))%>%
+    rename(obs = joint_p.x, pred = joint_p.y) %>%
+    left_join(p_complete, by = c("group","sameCue",conditional_vars,"subject")) %>%
+    mutate(pred = pred * p_complete)
 
   if (likelihood %in% c("all","accuracy")) {
-    multinomial_lik <- select(joint, -contains("RT")) %>%
-      spread(type, joint_p) %>%
+
+    J_acc_lik <- J_acc %>%
+      filter(!is.na(pred)) %>%
       mutate(pred = replace(pred, pred==0, .Machine$double.xmin)) %>%
       with(multinomialLL(obs, pred, N = 20))
+
     error <- error + multinomial_lik
   }
 
   if (likelihood %in% c("all","RT")) {
-    multinomial_RT <- select(joint, group:final_acc,rawRTs, type) %>%
-      filter(final_acc == 1, practice1acc ==1) %>%
+    J_RT_lik <- J_RT %>%
+      filter(!is.null(pred)) %>%
       rowwise() %>%
-      summarise(group = group, type = type, practice1acc = practice1acc, final_acc = final_acc,
-                prac = mean(rawRTs[,1]), delta = mean(rawRTs[,2] -rawRTs[,1]))
-
-    error <- error + sum((multinomial_RT$prac[multinomial_RT$type == "obs"] - multinomial_RT$prac[multinomial_RT$type == "pred"])^2) +
-      sum((multinomial_RT$delta[multinomial_RT$type == "obs"] - multinomial_RT$delta[multinomial_RT$type == "pred"])^2)
-
+      mutate(lik = list(apply(obs, 1,
+                              function(x,y) {
+                                a <- x-y
+                                a <- a[a[,1]>=0 & a[,2]>=0,]
+                                sum(apply(a, 1, function(z) prod(dexp(z, rate =1))))
+                              },
+                              y=pred)))
+    error <- error + sum(unlist(J_RT_lik$lik))
   }
-    # x_axis_points <- expand.grid(seq(.1,8,by=.1), seq(.1,8,by=.1))
-    # joint_density <- filter(joint, practice1acc == 1, final_acc ==1, type=="pred") %>%
-    #   select(group:final_acc, rawRTs) %>%
-    #   rowwise() %>%
-    #   mutate(KD = list(ks::kde(rawRTs, H = matrix(c(1,0,0,1),2),  binned = TRUE,
-    #                            eval.points = x_axis_points)))
-    # joint_density$KD <- lapply(joint_density$KD, function(k){
-    #   data.frame(pracRT = round(k$eval.points[[1]],1),
-    #              finalRT = round(k$eval.points[[2]],1),
-    #              density = k$estimate/sum(k$estimate))
-    #   })
-    #
-    # joint_density <- select(joint_density, -KD) %>%
-    #   rowwise() %>%
-    #   mutate(rawRTs = list(setNames(as.data.frame(rawRTs), c("pracRT","finalRT"))),
-    #          rawRTs = list(as.data.frame(lapply(rawRTs, round, 1)))) %>%
-    #   unnest() %>%
-    #   left_join(unnest(select(joint_density, -rawRTs)),
-    #             c("group", "sameCue", "practice1acc", "final_acc", "pracRT", "finalRT"))
-    # joint_RT_lik <- sum(-log(joint_density$density))
-    # error <- error + joint_RT_lik
-  # }
-
-  if (likelihood %in% c("all","RT")) {
-    return_data <- list(error = error, IV = list(IV), Joint = list(joint, multinomial_RT))
-  } else {
-    return_data <- list(error = error, IV = IV, Joint = joint)
-  }
-
-  return(return_data)
+  return(list(error = error))
 }
 
 #' @export
