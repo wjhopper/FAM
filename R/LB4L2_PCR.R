@@ -230,23 +230,6 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
     left_join(p_complete, by = c("group","practice","OCpractice","final_acc","subject")) %>%
     mutate(pred = pred * p_complete)
 
-  if (likelihood %in% c("all","accuracy")) {
-    IV_acc_lik <- IV_acc %>%
-      filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
-      with(binomialLL(obs = obs, pred = pred, N = 20))
-    error <- error + IV_acc_lik
-  }
-
-  if (likelihood %in% c("all","RT")) {
-    IV_RT_lik <- IV_RT %>%
-      filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
-      rowwise() %>%
-      mutate(lik = list(sapply(obs,
-                               function(x,y) { sum(dexp(Filter(function(z) {z>=0}, x-y))) },
-                               y=pred)))
-    error <- error + sum(unlist(IV_RT_lik$lik))
-  }
-
   ## joint probabilities section ##
   conditional_vars <- grep("*acc$", names(joint_obs), value=TRUE)
 
@@ -278,15 +261,26 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
 
   if (likelihood %in% c("all","accuracy")) {
 
+    IV_acc_lik <- IV_acc %>%
+      filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
+      with(binomialLL(obs = obs, pred = pred, N = 20))
+
     J_acc_lik <- J_acc %>%
       filter(!is.na(pred)) %>%
       mutate(pred = replace(pred, pred==0, .Machine$double.xmin)) %>%
       with(multinomialLL(obs, pred, N = 20))
 
-    error <- error + multinomial_lik
+    error <- error + IV_acc_lik + multinomial_lik
   }
 
   if (likelihood %in% c("all","RT")) {
+
+    IV_RT_lik <- IV_RT %>%
+      filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
+      rowwise() %>%
+      mutate(lik = list(sapply(obs,
+                               function(x,y) { sum(dexp(Filter(function(z) {z>=0}, x-y))) },
+                               y=pred)))
     J_RT_lik <- J_RT %>%
       filter(!is.null(pred)) %>%
       rowwise() %>%
@@ -297,7 +291,7 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
                                 sum(apply(a, 1, function(z) prod(dexp(z, rate =1))))
                               },
                               y=pred)))
-    error <- error + sum(unlist(J_RT_lik$lik))
+    error <- error + sum(unlist(IV_RT_lik$lik)) + sum(unlist(J_RT_lik$lik))
   }
   return(list(error = error))
 }
