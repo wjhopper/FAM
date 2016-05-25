@@ -165,7 +165,7 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
 #' fitPCR
 #'
 #' @param PCRparams_obj
-#' @param objective_fcn E.g., LB4L2_PCR
+#' @param prediction_fcn E.g., LB4L2_PCR
 #' @param error_fcn
 #' @param ...
 #'
@@ -176,7 +176,7 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
 #'
 #' @examples
 
-fitPCR <- function(free_parameters, PCRparams_obj, objective_fcn, error_fcn, ...) {
+fitPCR <- function(free_parameters, PCRparams_obj, prediction_fcn, error_fcn, ...) {
 
   PCRparams_obj <- update(PCRparams_obj, as.list(free_parameters))
   acc_param_vals <- PCRparams_obj$params[names(PCRparams_obj$params) %in% c("ER","LR","FR","FR2","TR","space","TC")]
@@ -194,7 +194,7 @@ fitPCR <- function(free_parameters, PCRparams_obj, objective_fcn, error_fcn, ...
     return(1000000)
   }
 
-  raw <- objective_fcn(PCRparams_obj, groups = list(...)$group)
+  raw <- prediction_fcn(PCRparams_obj, groups = list(...)$group)
   if (length(raw) > 1) {
     simulations <- lapply(raw, summary)
     simulations <- do.call(mapply, c(list(FUN = bind_rows), simulations , list(.id = "group")))
