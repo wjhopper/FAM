@@ -20,7 +20,7 @@
 LB4L2_PCR <- function(PCR_model_obj, groups = 1, ...) {
 
   stopifnot(is.finite(groups) && groups > 0)
-  results <- vector (mode = "list", length = groups)
+  simulations <- vector (mode = "list", length = groups)
 
   control <- study(PCR_model_obj, nCues = 1, tests_per_cue = 1) %>%
     forget(cue = 1) %>%
@@ -51,23 +51,23 @@ LB4L2_PCR <- function(PCR_model_obj, groups = 1, ...) {
     thresh_change() %>%
     cuedRecall(cue = 1, increment = FALSE)
 
-  results[[1]] <- list("SC_test" = SC_test, "SC_study" = SC_study,
+  simulations[[1]] <- list("SC_test" = SC_test, "SC_study" = SC_study,
                        "OC_test" = OC_test, "OC_study" = OC_study,
                        "control" = control)
-  class(results[[1]]) <- c("LB4L2_PCR")
+  class(simulations[[1]]) <- c("LB4L2_PCR")
   done <- 1
   while (done < groups) {
     x <- update(PCR_model_obj, list(FR = PCR_model_obj$params[[paste0("FR",done+1)]]))
-    results[done + 1]<- LB4L2_PCR(x, groups = 1)
-    class(results[[done + 1]]) <- c("LB4L2_PCR", class(results))
+    simulations[done + 1]<- LB4L2_PCR(x, groups = 1)
+    class(simulations[[done + 1]]) <- c("LB4L2_PCR", class(simulations))
     done <- done + 1
-    if (done == length(results)) {
-      results <- setNames(results, paste0("group",1:groups))
+    if (done == length(simulations)) {
+      simulations <- setNames(simulations, paste0("group",1:groups))
     }
 
   }
 
-  return(results)
+  return(simulations)
 
 }
 
@@ -76,13 +76,13 @@ LB4L2_PCR <- function(PCR_model_obj, groups = 1, ...) {
 #' @importFrom tidyr gather
 summary.LB4L2_PCR <- function(x, DV = "recalled") {
 
-  IVresults <- bind_rows(lapply(x, summary), .id = "condition") %>%
+  IV <- bind_rows(lapply(x, summary), .id = "condition") %>%
     mutate(practice = toupper(substr(practice,1,1)))
 
-  practice_test <- filter(IVresults, practice == "T", test == 1) %>%
+  practice_test <- filter(IV, practice == "T", test == 1) %>%
     mutate(sameCue = ifelse(grepl("OC", condition), "no", "yes"))
 
-  final_test <- anti_join(IVresults,practice_test,
+  final_test <- anti_join(IV,practice_test,
                           by = c("condition","practice","test")) %>%
     group_by(condition) %>%
     mutate(OCpractice = switch(first(condition),
@@ -137,8 +137,8 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
                                    dimnames = list(NULL, c("practiceRT", "finalRT"))))
               )
 
-  joint_results <- cbind(as.data.frame(SC_joint_acc),
-                         as.data.frame(OC_joint_acc)) %>%
+  J <- cbind(as.data.frame(SC_joint_acc),
+             as.data.frame(OC_joint_acc)) %>%
     mutate(condition = rownames(.)) %>%
     separate(condition, c("practice", "final")) %>%
     mutate(practice = ifelse(practice == "cor", 1, 0),
@@ -152,14 +152,14 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
   SC_CD <- SC_joint_acc[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="yes"]))
   OC_CD <- OC_joint_acc[c("cor_cor", "inc_cor")]/abs((c(0,1) - practice_test$accuracy[practice_test$sameCue=="no"]))
 
-  CD_results <- cbind(as.data.frame(SC_CD), as.data.frame(OC_CD)) %>%
+  CD <- cbind(as.data.frame(SC_CD), as.data.frame(OC_CD)) %>%
     mutate(practice = gsub("_cor", "", rownames(.))) %>%
     gather(sameCue, accuracy, SC_CD, OC_CD) %>%
     mutate(sameCue = ifelse(sameCue == "SC_CD", "yes", "no")) %>%
     mutate(sameCue, practice, accuracy)
 
   return(list(practice= practice_test, final = final_test,
-              conditional = CD_results, joint = joint_results))
+              conditional = CD, joint = J))
 }
 
 #' fitPCR
@@ -196,22 +196,21 @@ fitPCR <- function(free_parameters, PCRparams_obj, objective_fcn, error_fcn, ...
 
   raw <- objective_fcn(PCRparams_obj, groups = list(...)$group)
   if (length(raw) > 1) {
-    results <- lapply(raw, summary)
-    results <- do.call(mapply, c(list(FUN = bind_rows), results , list(.id = "group")))
+    simulations <- lapply(raw, summary)
+    simulations <- do.call(mapply, c(list(FUN = bind_rows), simulations , list(.id = "group")))
   } else {
-    results <- summary(raw)
+    simulations <- summary(raw)
   }
 
-  error <- error_fcn(results, ...)
+  error <- error_fcn(simulations, ...)
   return(error$error)
 
 }
 
 #' LB4L2_PCR Error Function
 #'
-#' @param results
-#' @param IV_obs
-#' @param joint_obs
+#' @param simulations
+#' @param observations
 #' @param likelihood
 #'
 #' @return
@@ -223,17 +222,18 @@ fitPCR <- function(free_parameters, PCRparams_obj, objective_fcn, error_fcn, ...
 #' @export
 #'
 #' @examples
-LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accuracy","all"), ...) {
+LB4L2_PCR_erf <- function(simulations, observations,
+                          likelihood = c("RT","accuracy","all"), ...) {
 
   likelihood <- match.arg(likelihood,  c("RT","accuracy","all"))
   error <- 0
 
-  IV_pred <- results$final %>%
+  IV_pred <- simulations$final %>%
     select(group, practice, OCpractice, final_acc = accuracy,
            mean_p = proportion, mean_RT = medianRT, rawRTs) %>%
     mutate(group = ifelse(group == "group1", "immediate", "delay"))
 
-  IV_RT <- inner_join(select(IV_obs, group:final_acc, rawRTs, subject),
+  IV_RT <- inner_join(select(observations$final, group:final_acc, rawRTs, subject),
                       select(IV_pred, group:final_acc, rawRTs),
                       by = c("group", "practice", "OCpractice", "final_acc")) %>%
     rename(obs = rawRTs.x, pred = rawRTs.y)
@@ -244,7 +244,7 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
     group_by_(.dots = setdiff(names(.), "pred")) %>%
     summarise(p_complete =  mean(pexp(8 - pred[[1]], rate = 1)))
 
-  IV_acc <- inner_join(select(IV_obs, group:mean_p, subject),
+  IV_acc <- inner_join(select(observations$final, group:mean_p, subject),
                        select(IV_pred, group:mean_p),
                        by = c("group", "practice", "OCpractice", "final_acc")) %>%
     rename(obs = mean_p.x, pred = mean_p.y) %>%
@@ -252,14 +252,14 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
     mutate(pred = pred * p_complete)
 
   ## joint probabilities section ##
-  conditional_vars <- grep("*acc$", names(joint_obs), value=TRUE)
+  conditional_vars <- grep("*acc$", names(observations$joint), value=TRUE)
 
-  J_pred <- results$joint %>%
+  J_pred <- simulations$joint %>%
     select(group, sameCue, practice1acc = practice, final_acc = final,
            joint_p = probability, rawRTs) %>%
     mutate(group = ifelse(group == "group1", "immediate", "delay"))
 
-  J_RT <- inner_join(select(joint_obs, group:final_acc, rawRTs, subject),
+  J_RT <- inner_join(select(observations$joint, group:final_acc, rawRTs, subject),
                      select(J_pred, group:final_acc, rawRTs),
                      by = c("group","sameCue", conditional_vars)) %>%
     rename(obs = rawRTs.x, pred = rawRTs.y)
@@ -273,7 +273,7 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
     group_by_(.dots = setdiff(names(.), "pred")) %>%
     summarise(p_complete =  mean(apply((pexp(8 - pred[[1]])),1,prod)))
 
-  J_acc <- inner_join(select(joint_obs, group:joint_p, subject),
+  J_acc <- inner_join(select(observations$joint, group:joint_p, subject),
                       select(J_pred, group:joint_p),
                       by = c("group","sameCue", conditional_vars))%>%
     rename(obs = joint_p.x, pred = joint_p.y) %>%

@@ -198,7 +198,6 @@ if (params$subset != FALSE && is.numeric(params$subet)) {
   subs <- subs[subs %in% params$subset]
 }
 
-
 param_search <- function(theta, PCR, parameter_sets) {
 
   index <- globalenv()$j
@@ -214,15 +213,17 @@ param_search <- function(theta, PCR, parameter_sets) {
                       objective_fcn = LB4L2_PCR, # for fn
                       error_fcn = LB4L2_PCR_erf,# for fn
                       groups = globalenv()$groups, # for objective_fn
-                      IV_obs = filter(IV_obs, subject == index), # for error_fcn
-                      joint_obs = filter(joint_obs, subject == index), # for error_fcn
-                      likelihood = names(parameter_sets[1]))
+                      observations = list(final = filter(IV_obs, subject==index), # for error_fcn
+                                          joint = filter(joint_obs, subject==index)),
+                      likelihood = names(parameter_sets[1])) # for error_fcn
   } else {
-    error <- fitPCR(free_parameters = p, PCRparams_obj = PCR,
-                    objective_fcn = LB4L2_PCR, error_fcn = LB4L2_PCR_erf,
+    error <- fitPCR(free_parameters = p, 
+                    PCRparams_obj = PCR,
+                    objective_fcn = LB4L2_PCR, 
+                    error_fcn = LB4L2_PCR_erf,
                     groups = globalenv()$groups, # for objective_fn
-                    IV_obs = filter(IV_obs, subject == index), # for error_fcn
-                    joint_obs = filter(joint_obs, subject == index), # for error_fcn
+                    observations = list(final = filter(IV_obs, subject==index), # for error_fcn
+                                        joint = filter(joint_obs, subject==index)),
                     likelihood = names(parameter_sets[1])) # for error_fcn
     results <- as.data.frame(as.list(c(p, value = error)))
   }
