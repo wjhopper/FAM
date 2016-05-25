@@ -98,8 +98,8 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
                           cor_cor = SC_test[,,1], inc_cor = !SC_test[,,1]),
                      list(!SC_test[,,2], !SC_test[,,2], SC_test[,,2], SC_test[,,2]))
 
-  OC_tp <- x[["OC_test"]]$recalled[[2]]
-  OC_final <- x[["OC_test"]]$recalled[[1]]
+  OC_tp <- x[["OC_test"]]$recalled$Cue2
+  OC_final <- x[["OC_test"]]$recalled$Cue1
   OC_joint <- mapply(`&`,
                     list(cor_inc = OC_tp, inc_inc = !OC_tp,
                          cor_cor = OC_tp, inc_cor = !OC_tp),
@@ -110,13 +110,35 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
   OC_joint_acc <- colMeans(OC_joint)
 
   ## Joint RT results
-  raw_joint_RT <- list(OC_joint_RT = sapply(x[['OC_test']]$RT, `[`, OC_joint[,"cor_cor"]),
-                       SC_joint_RT = apply(x[['SC_test']]$RT[[1]], 3, `[`, SC_joint[,"cor_cor"])) %>%
-    lapply(`dimnames<-`, (list(NULL, c("practice", "final")))) %>%
-    mutate(tbl_df(data.frame(sameCue = c("no","yes"), practice = 1, final =1)),
-           raw_joint_RTs = .)
+  LU_table <- list(joint_outcome = c(cor_inc = "1_0", inc_inc = "0_0",
+                                     cor_cor = "1_1",  inc_cor = "0_1"))
+  raw_joint_RT <- list(OC_joint_RT = apply(OC_joint, 2,
+                                           function(j) {
+                                             sapply(rev(x[['OC_test']]$RT), `[`, j)
+                                           }),
+                       SC_joint_RT = apply(SC_joint, 2,
+                                           function(j) {
+                                             apply(x[['SC_test']]$RT$Cue1, 3, `[`,j)
+                                           })) %>%
+    lapply(function(x) {
+      lapply(x, function(y) {
+        as.data.frame(`dimnames<-`(y, list(NULL, c("practiceRT", "finalRT"))))
+        })
+      }) %>%
+    lapply(bind_rows, .id = "joint_outcome") %>%
+    bind_rows(.id = "condition") %>%
+    mutate(condition = ifelse(condition == "SC_joint_RT", "yes", "no"),
+           joint_outcome = LU_table$joint_outcome[joint_outcome]) %>%
+    rename(sameCue = condition) %>%
+    separate(joint_outcome, c("practice", "final")) %>%
+    mutate_each('as.numeric', practice,final) %>%
+    group_by(sameCue, practice, final) %>%
+    summarise(rawRTs = list(matrix(c(practiceRT,finalRT),ncol=2,
+                                   dimnames = list(NULL, c("practiceRT", "finalRT"))))
+              )
 
-  joint_results <- cbind(as.data.frame(SC_joint_acc), as.data.frame(OC_joint_acc)) %>%
+  joint_results <- cbind(as.data.frame(SC_joint_acc),
+                         as.data.frame(OC_joint_acc)) %>%
     mutate(condition = rownames(.)) %>%
     separate(condition, c("practice", "final")) %>%
     mutate(practice = ifelse(practice == "cor", 1, 0),
@@ -139,7 +161,6 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
   return(list(practice= practice_test, final = final_test,
               conditional = CD_results, joint = joint_results))
 }
-
 
 #' fitPCR
 #'
@@ -235,7 +256,7 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
 
   J_pred <- results$joint %>%
     select(group, sameCue, practice1acc = practice, final_acc = final,
-           joint_p = probability, rawRTs = raw_joint_RTs) %>%
+           joint_p = probability, rawRTs) %>%
     mutate(group = ifelse(group == "group1", "immediate", "delay"))
 
   J_RT <- inner_join(select(joint_obs, group:final_acc, rawRTs, subject),
@@ -282,7 +303,7 @@ LB4L2_PCR_erf <- function(results, IV_obs, joint_obs, likelihood = c("RT","accur
                                function(x,y) { sum(dexp(Filter(function(z) {z>=0}, x-y))) },
                                y=pred)))
     J_RT_lik <- J_RT %>%
-      filter(!is.null(pred)) %>%
+      filter(!is.null(obs)) %>%
       rowwise() %>%
       mutate(lik = list(apply(obs, 1,
                               function(x,y) {
