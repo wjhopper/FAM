@@ -210,7 +210,7 @@ param_search <- function(theta, PCR, parameter_sets) {
                       itnmax = 1000,
                       control = list(kkt=FALSE),
                       PCRparams_obj = PCR, # for fn
-                      objective_fcn = LB4L2_PCR, # for fn
+                      prediction_fcn = LB4L2_PCR, # for fn
                       error_fcn = LB4L2_PCR_erf,# for fn
                       groups = globalenv()$groups, # for objective_fn
                       observations = list(final = filter(IV_obs, subject==index), # for error_fcn
@@ -219,7 +219,7 @@ param_search <- function(theta, PCR, parameter_sets) {
   } else {
     error <- fitPCR(free_parameters = p, 
                     PCRparams_obj = PCR,
-                    objective_fcn = LB4L2_PCR, 
+                    prediction_fcn = LB4L2_PCR, 
                     error_fcn = LB4L2_PCR_erf,
                     groups = globalenv()$groups, # for objective_fn
                     observations = list(final = filter(IV_obs, subject==index), # for error_fcn
