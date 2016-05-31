@@ -228,90 +228,116 @@ LB4L2_PCR_erf <- function(simulations, observations,
   likelihood <- match.arg(likelihood,  c("RT","accuracy","all"))
   error <- 0
 
-  IV_pred <- simulations$final %>%
-    select(group, practice, OCpractice, final_acc = accuracy,
-           mean_p = proportion, mean_RT = medianRT, rawRTs) %>%
-    mutate(group = ifelse(group == "group1", "immediate", "delay"))
+  simulations$final %<>% mutate(group = ifelse(group == "group1", "immediate", "delay"))
+  simulations$joint %<>% mutate(group = ifelse(group == "group1", "immediate", "delay"))
 
-  IV_RT <- inner_join(select(observations$final, group:final_acc, rawRTs, subject),
-                      select(IV_pred, group:final_acc, rawRTs),
-                      by = c("group", "practice", "OCpractice", "final_acc")) %>%
-    rename(obs = rawRTs.x, pred = rawRTs.y)
-
-  p_complete <- IV_RT %>%
-    select(-obs) %>%
-    filter(final_acc == 1) %>%
-    group_by_(.dots = setdiff(names(.), "pred")) %>%
-    summarise(p_complete =  mean(pexp(8 - pred[[1]], rate = 1)))
-
-  IV_acc <- inner_join(select(observations$final, group:mean_p, subject),
-                       select(IV_pred, group:mean_p),
-                       by = c("group", "practice", "OCpractice", "final_acc")) %>%
-    rename(obs = mean_p.x, pred = mean_p.y) %>%
-    left_join(p_complete, by = c("group","practice","OCpractice","final_acc","subject")) %>%
-    mutate(pred = pred * p_complete)
+  # grep("^pred_", names(IV), value=TRUE, invert = TRUE)
+  IV <- inner_join(rename(observations$final, obs_mean_p = mean_p,
+                          obs_mean_RT = mean_RT, obs_RTs = rawRTs),
+                   select(simulations$final, group, practice, OCpractice,
+                          final_acc = accuracy, pred_mean_p = proportion,
+                          pred_mean_RT = medianRT, pred_RTs = rawRTs),
+                   by = c("group", "practice", "OCpractice", "final_acc")) %>%
+    group_by_(.dots = c("group", "practice", "OCpractice")) %>%
+    mutate(p_complete = ifelse(final_acc == 1,
+                               mean(pexp(8 - pred_RTs[[which(final_acc==1)]], rate = 1)),
+                               NA),
+           pred_mean_p = pred_mean_p * p_complete,
+           pred_mean_p = replace(pred_mean_p, is.na(pred_mean_p), 1-pred_mean_p[!is.na(pred_mean_p)]))
 
   ## joint probabilities section ##
   conditional_vars <- grep("*acc$", names(observations$joint), value=TRUE)
+  J <- inner_join(rename(observations$joint, obs_joint_p = joint_p,
+                         obs_mean_RT = mean_RT, obs_RTs = rawRTs),
+                  select(simulations$joint, group, sameCue,
+                         practice1acc = practice, final_acc = final,
+                         pred_joint_p = probability, pred_RTs = rawRTs),
+                     by = c("group","sameCue", conditional_vars))
+    mixed <- J %>%
+      filter(final_acc != practice1acc) %>%
+      rowwise() %>%
+      mutate(p_complete =  mean(pexp(8 - pred_RTs[,which(c(practice1acc, final_acc)==1)])))%>%
+      select(-contains("RTs"))
 
-  J_pred <- simulations$joint %>%
-    select(group, sameCue, practice1acc = practice, final_acc = final,
-           joint_p = probability, rawRTs) %>%
-    mutate(group = ifelse(group == "group1", "immediate", "delay"))
+    one_one <- J %>%
+      filter(final_acc ==1, practice1acc==1) %>%
+      rowwise() %>%
+      mutate(prac_complete = mean(pexp(8 - pred_RTs[,1])),
+             final_complete = mean(pexp(8 - pred_RTs[,2])),
+             both_complete = mean(apply(pexp(8 - pred_RTs),1,prod))) %>%
+      select(-contains("RTs"))
 
-  J_RT <- inner_join(select(observations$joint, group:final_acc, rawRTs, subject),
-                     select(J_pred, group:final_acc, rawRTs),
-                     by = c("group","sameCue", conditional_vars)) %>%
-    rename(obs = rawRTs.x, pred = rawRTs.y)
+    J <- Reduce(function(x,y) {
+            left_join(x,y, by = c("group", "sameCue", "practice1acc","final_acc",
+                            "obs_joint_p", "obs_mean_RT", "subject", "pred_joint_p"))
+            },
+            list(J, mixed, one_one)) %>%
+      mutate(prac_complete = replace(prac_complete,
+                                      final_acc == 0 & practice1acc == 1,
+                                      p_complete[final_acc == 0 & practice1acc == 1]),
+             final_complete = replace(final_complete,
+                                      final_acc == 1 & practice1acc == 0,
+                                      p_complete[final_acc == 1 & practice1acc == 0]),
+             p_complete = NULL)
+
+    J %<>% group_by(group,sameCue) %>%
+      do( {
+        one_one <- .$practice1acc == 1 & .$final_acc == 1
+        one_zero <- .$practice1acc == 1 & .$final_acc == 0
+        zero_one <- .$practice1acc == 0 & .$final_acc == 1
+        zero_zero <- .$practice1acc == 0 & .$final_acc == 0
+        d <- .[,c("group","sameCue","practice1acc","final_acc","obs_joint_p",
+                  "obs_mean_RT", "obs_RTs", "subject", "pred_RTs")]
+        d$pred_joint_p <- NA
+        d$pred_joint_p[zero_zero] <- sum(.$pred_joint_p[zero_zero],
+                                         .$pred_joint_p[zero_one] - (.$final_complete[zero_one] * .$pred_joint_p[zero_one]),
+                                         .$pred_joint_p[one_zero] - (.$prac_complete[one_zero] * .$pred_joint_p[one_zero]))
+        d$pred_joint_p[zero_one] <- sum(.$pred_joint_p[zero_one] * .$final_complete[zero_one],
+                                        .$pred_joint_p[one_one] - (.$pred_joint_p[one_one] * .$final_complete[one_one]))
+        d$pred_joint_p[one_zero] <- sum(.$pred_joint_p[one_zero] * .$prac_complete[one_zero],
+                                        .$pred_joint_p[one_one] - (.$pred_joint_p[one_one] * .$prac_complete[one_one]))
+        d$pred_joint_p[one_one] <- .$pred_joint_p[one_one] * .$both_complete[one_one]
+        return(d)
+      } )
+
 
   # This finds the probability that each RT from the [correct, correct] condition
   # completes in 8 seconds. Then it multiplies those two together for the joint probability
   # that they both complete in less than 8 seconds. Those probabilities are then averaged.
-  p_complete <- J_RT %>%
-    select(-obs) %>%
-    filter(!is.null(pred)) %>%
-    group_by_(.dots = setdiff(names(.), "pred")) %>%
-    summarise(p_complete =  mean(apply((pexp(8 - pred[[1]])),1,prod)))
 
-  J_acc <- inner_join(select(observations$joint, group:joint_p, subject),
-                      select(J_pred, group:joint_p),
-                      by = c("group","sameCue", conditional_vars))%>%
-    rename(obs = joint_p.x, pred = joint_p.y) %>%
-    left_join(p_complete, by = c("group","sameCue",conditional_vars,"subject")) %>%
-    mutate(pred = pred * p_complete)
 
   if (likelihood %in% c("all","accuracy")) {
 
-    IV_acc_lik <- IV_acc %>%
+    IV_acc_lik <- IV %>%
       filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
-      with(binomialLL(obs = obs, pred = pred, N = 20))
+      with(binomialLL(obs = obs_mean_p, pred = pred_mean_p, N = 20))
 
-    J_acc_lik <- J_acc %>%
-      filter(!is.na(pred)) %>%
-      mutate(pred = replace(pred, pred==0, .Machine$double.xmin)) %>%
-      with(multinomialLL(obs, pred, N = 20))
+    J_acc_lik <- J %>%
+      filter(!is.na(pred_joint_p)) %>%
+      mutate(pred = replace(pred_joint_p, pred_joint_p==0, .Machine$double.xmin)) %>%
+      with(multinomialLL(obs_joint_p, pred_joint_p, N = 20))
 
     error <- error + IV_acc_lik + multinomial_lik
   }
 
   if (likelihood %in% c("all","RT")) {
 
-    IV_RT_lik <- IV_RT %>%
+    IV_RT_lik <- IV %>%
       filter(final_acc ==1, (practice != "T" & OCpractice != "T")) %>%
       rowwise() %>%
-      mutate(lik = list(sapply(obs,
+      mutate(lik = list(sapply(obs_RTs,
                                function(x,y) { sum(dexp(Filter(function(z) {z>=0}, x-y))) },
-                               y=pred)))
-    J_RT_lik <- J_RT %>%
-      filter(!is.null(obs)) %>%
+                               y=pred_RTs)))
+    J_RT_lik <- J %>%
       rowwise() %>%
-      mutate(lik = list(apply(obs, 1,
+      filter(!is.null(obs_RTs)) %>%
+      mutate(lik = list(apply(obs_RTs, 1,
                               function(x,y) {
                                 a <- x-y
                                 a <- a[a[,1]>=0 & a[,2]>=0,]
                                 sum(apply(a, 1, function(z) prod(dexp(z, rate =1))))
                               },
-                              y=pred)))
+                              y=pred_RTs)))
     error <- error + sum(unlist(IV_RT_lik$lik)) + sum(unlist(J_RT_lik$lik))
   }
   return(list(error = error))
