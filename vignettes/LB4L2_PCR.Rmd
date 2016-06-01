@@ -41,31 +41,27 @@ final <- LB4L2_final %>%
 practice <- LB4L2_tp %>%
   mutate(acc = ifelse((RT < .2 | RT > 8 ) & !is.na(RT), 0, acc))
 
-IV_summary <- summary(final, level = params$mode)
-
-sub_RT <- summary(final, level = "subject") %>%
+IV_obs <- summary(final, level = "subject") %>%
   filter(p !=0) %>% #practice != "T", OCpractice != "T", final_acc ==1, 
   select(group, practice, OCpractice, final_acc, RT) %>%
   group_by(group, practice, OCpractice, final_acc) %>%
-  summarise(RTs = list(round(RT,1)))
+  summarise(RTs = list(round(RT,1))) %>%
+  inner_join(x = select(summary(final, level = params$mode), group:mean_RT),
+             y = .,
+             by = c("group", "practice", "OCpractice", "final_acc"))
 
-IV_obs <- select(IV_summary, group:mean_RT) %>%
-  inner_join(sub_RT)
-
-joint_summary <- summary(final, level = "group", given_practice = 1, given_data = practice) 
-
-joint_obs_sub <- summary(final, given_practice = 1, given_data = practice) %>%
+joint_obs <- summary(final, given_practice = 1, given_data = practice) %>%
   filter(p != 0) %>%
   select(group:final_acc, contains("RT")) %>%
   group_by(group, sameCue, practice1acc, final_acc) %>%
-  summarise(RTs = list(matrix(c(practice1RT, RT), ncol = 2)))
-
-joint_obs <- select(joint_summary, group:mean_RT) %>%
-  inner_join(joint_obs_sub, by = c("group", "sameCue", "practice1acc", "final_acc")) %>%
+  summarise(RTs = list(matrix(c(practice1RT, RT), ncol = 2))) %>%
+  inner_join(x = select(summary(final, level = "group",
+                                given_practice = 1, given_data = practice),
+                        group:mean_RT),
+             y = .,
+             by = c("group", "sameCue", "practice1acc", "final_acc")) %>%
   rowwise() %>%
   mutate(RTs = if(final_acc == 1 & practice1acc == 1) {list(RTs)} else {list(NULL)})
-
-rm(joint_obs_sub, sub_RT)
 
 if (params$mode == "group") {
   joint_obs$subject = 1
