@@ -133,8 +133,8 @@ summary.LB4L2_PCR <- function(x, DV = "recalled") {
     separate(joint_outcome, c("practice", "final")) %>%
     mutate_each('as.numeric', practice,final) %>%
     group_by(sameCue, practice, final) %>%
-    summarise(rawRTs = list(matrix(c(practiceRT,finalRT),ncol=2,
-                                   dimnames = list(NULL, c("practiceRT", "finalRT"))))
+    summarise(RTs = list(matrix(c(practiceRT,finalRT),ncol=2,
+                                dimnames = list(NULL, c("practiceRT", "finalRT"))))
               )
 
   J <- cbind(as.data.frame(SC_joint_acc),
@@ -233,10 +233,10 @@ LB4L2_PCR_erf <- function(simulations, observations,
 
   # grep("^pred_", names(IV), value=TRUE, invert = TRUE)
   IV <- inner_join(rename(observations$final, obs_mean_p = mean_p,
-                          obs_mean_RT = mean_RT, obs_RTs = rawRTs),
+                          obs_mean_RT = mean_RT, obs_RTs = RTs),
                    select(simulations$final, group, practice, OCpractice,
                           final_acc = accuracy, pred_mean_p = proportion,
-                          pred_mean_RT = medianRT, pred_RTs = rawRTs),
+                          pred_mean_RT = medianRT, pred_RTs = RTs),
                    by = c("group", "practice", "OCpractice", "final_acc")) %>%
     group_by_(.dots = c("group", "practice", "OCpractice")) %>%
     mutate(p_complete = ifelse(final_acc == 1,
@@ -248,10 +248,10 @@ LB4L2_PCR_erf <- function(simulations, observations,
   ## joint probabilities section ##
   conditional_vars <- grep("*acc$", names(observations$joint), value=TRUE)
   J <- inner_join(rename(observations$joint, obs_joint_p = joint_p,
-                         obs_mean_RT = mean_RT, obs_RTs = rawRTs),
+                         obs_mean_RT = mean_RT, obs_RTs = RTs),
                   select(simulations$joint, group, sameCue,
                          practice1acc = practice, final_acc = final,
-                         pred_joint_p = probability, pred_RTs = rawRTs),
+                         pred_joint_p = probability, pred_RTs = RTs),
                      by = c("group","sameCue", conditional_vars))
     mixed <- J %>%
       filter(final_acc != practice1acc) %>%

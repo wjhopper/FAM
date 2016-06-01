@@ -47,7 +47,7 @@ sub_RT <- summary(final, level = "subject") %>%
   filter(p !=0) %>% #practice != "T", OCpractice != "T", final_acc ==1, 
   select(group, practice, OCpractice, final_acc, RT) %>%
   group_by(group, practice, OCpractice, final_acc) %>%
-  summarise(rawRTs = list(round(RT,1)))
+  summarise(RTs = list(round(RT,1)))
 
 IV_obs <- select(IV_summary, group:mean_RT) %>%
   inner_join(sub_RT)
@@ -58,12 +58,12 @@ joint_obs_sub <- summary(final, given_practice = 1, given_data = practice) %>%
   filter(p != 0) %>%
   select(group:final_acc, contains("RT")) %>%
   group_by(group, sameCue, practice1acc, final_acc) %>%
-  summarise(rawRTs = list(matrix(c(practice1RT, RT), ncol = 2)))
+  summarise(RTs = list(matrix(c(practice1RT, RT), ncol = 2)))
 
 joint_obs <- select(joint_summary, group:mean_RT) %>%
   inner_join(joint_obs_sub, by = c("group", "sameCue", "practice1acc", "final_acc")) %>%
   rowwise() %>%
-  mutate(rawRTs = if(final_acc == 1 & practice1acc == 1) {list(rawRTs)} else {list(NULL)})
+  mutate(RTs = if(final_acc == 1 & practice1acc == 1) {list(RTs)} else {list(NULL)})
 
 rm(joint_obs_sub, sub_RT)
 
@@ -293,7 +293,7 @@ print(xtable(cbind(best_params, Deviance = 2*fit[1,"value"]), digits=3),
 ```{r plots}
 shape_scale <- scale_shape_manual("Type", breaks = c("obs", "pred"),
                                   labels = c("Observed", "PCR"), values = c(16,2))
-IVplot_data <- select(error$IV[[1]], -subject, -rawRTs) %>%
+IVplot_data <- select(error$IV[[1]], -subject, -RTs) %>%
   left_join(mutate(select(IV_summary, -mean_p, -mean_RT), type = "obs"),
             by = c("group", "practice", "OCpractice", "final_acc", "type"))
 autoplot(as_LB4L_summary(filter(IVplot_data, type == "obs")), 
@@ -314,7 +314,7 @@ autoplot(as_LB4L_summary(filter(IVplot_data, final_acc ==1, type == "obs")),
   shape_scale + 
   ggtitle("PCR vs. Obs.")
 
-jointplot_data <- select(error$Joint[[1]], -subject, -rawRTs)  %>%
+jointplot_data <- select(error$Joint[[1]], -subject, -RTs)  %>%
   left_join(mutate(select(joint_summary, -joint_p, -mean_RT), type = "obs"),
             by = c("group", "sameCue", "practice1acc", "final_acc", "type"))
 autoplot(as_LB4L_CD_summary(filter(jointplot_data, type == "obs")),
