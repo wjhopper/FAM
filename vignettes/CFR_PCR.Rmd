@@ -20,6 +20,7 @@ params:
 knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE, 
                warning=F, message=FALSE, fig.align='center')
 library(dplyr)
+library(magrittr)
 # library(FAM)
 devtools::load_all() # at least SHA b9ea7e8 
 library(reshape2)
@@ -56,8 +57,6 @@ study_beta <- function(mem, nFeatures, LR, FR = NULL) {
 
 test_beta <- function(mem, nFeatures, thresh, acc, LR, TR, FR=NULL) {
 
-#   strengths <- mem #copy encoded features. Strengths will be updated and returned, not mem
-#   theta  <- thresh #copy current thresholds. theta will be updated and returned, not thresh
   mxn <- prod(dim(mem))
   nCor = sum(acc)
 
@@ -94,21 +93,17 @@ test_beta <- function(mem, nFeatures, thresh, acc, LR, TR, FR=NULL) {
 CFR_PCR <- FAM::CFR_PCR
 RTdist <- FAM::RTdist
 
-accuracyErrorFcn <- function(free, fixed, obs, fcn = CFR_PCR) {
+accuracyErrorFcn <- function(free, fixed, accuracy_observations, fcn = CFR_PCR, ...) {
   
   if (!paramBounds(c(free,fixed)) | anyNA(c(free,fixed))) {
     return(1000000)
   }
   preds <- fcn(free=free,fixed=fixed, summarised = TRUE)
-  obs <- obs %>% group_by(class,order) %>%
-    summarise(acc = sum(score)/4) %>%
-    ungroup() %>%
-    complete(class,order,fill=list(acc=0))
-  err <- sum((preds$acc-obs$acc)^2)
+  err <- sum((preds$acc-accuracy_observations$acc)^2)
   return(err)
 }
 
-RT_ErrorFcn <- function(free, fixed, obs, fcn = CFR_PCR) {
+RT_ErrorFcn <- function(free, fixed, RT_observations, fcn = CFR_PCR, ...) {
   
   if (!paramBounds(c(free,fixed)) | anyNA(c(free,fixed))) {
     return(1000000)
@@ -119,8 +114,9 @@ RT_ErrorFcn <- function(free, fixed, obs, fcn = CFR_PCR) {
     group_by(class) %>%
     summarise(complete = identical(unique(order), 1:c(free,fixed)['nList']))
   
-  if (!all(completes$complete) || nrow(completes) != length(unique(obs$class))) {
-    dist <- left_join(expand.grid(class=unique(obs$class),
+  if (!all(completes$complete) ||
+      nrow(completes) != length(unique(RT_observations$class))) {
+    dist <- left_join(expand.grid(class=unique(RT_observations$class),
                                   order = 1:c(free,fixed)['nList'],
                                   RT=seq(.1,c(free,fixed)['Time'],.1),
                                   stringsAsFactors = FALSE),
@@ -129,7 +125,8 @@ RT_ErrorFcn <- function(free, fixed, obs, fcn = CFR_PCR) {
     dist$y[is.na(dist$y)] <- 0
   }
   
-  likelihoods <- inner_join(select(obs, class, order, RT = RTrounded),
+  likelihoods <- inner_join(select(RT_observations,
+                                   class, order, RT = RTrounded),
                             dist,
                             by = c("class", "order", "RT"))
   err <- -sum(log(likelihoods$y))
@@ -146,17 +143,25 @@ minimization_routine <- function(model, erf = RT_ErrorFcn) {
                                parscale = c(1,1,200,1,1,100,1)),
                 fcn = model$obj, # passed to erf
                 fixed = model$fixed, # passed to erf
-                obs = model$data[model$data$subject == j,])      # passed to erf
+                RT_observations = model$RT_observations[model$RT_observations$subject == j,], # passed to erf
+                accuracy_observations = model$accuracy_observations[model$accuracy_observations$subject ==j,]) # passed to erf
   fit$subject = j
   return(fit)  
 }
 
 testing_routine <- function(model, erf = RT_ErrorFcn) {
-  err <- erf(free = model$free[[j]], fixed = model$fixed, 
-             obs = model$data[model$data$subject == j,])
+  err <- erf(free = model$free[[j]],
+             fixed = model$fixed,
+             obj = model$fcn,
+             RT_observations = model$RT_observations[model$RT_observations$subject == j,],
+             accuracy_observations = model$accuracy_observations[model$accuracy_observations$subject ==j,])
+
+  ## Manually create an optimx results data frame object
   fit <- structure(data.frame(t(c(model$free[[j]], value = err,subject=j))),
-                   details = NULL, maximize = NULL,
-                   npar = length(model$free[[j]]), follow.on=NULL,
+                   details = NULL,
+                   maximize = NULL,
+                   npar = length(model$free[[j]]),
+                   follow.on = NULL,
                    class = c("optimx", "data.frame"))
   return(fit)
 }
@@ -182,17 +187,30 @@ paramBounds <- function(p) {
 ```
 
 ```{r fetchData}
-CFR_tested <- filter(CFR_allSs,
-                     list != 0, score== 1,
-                     phase=='final' | (phase=='prac' & practice =='T')) %>%
-    ungroup() %>%
-    mutate(RTrounded = round(RT,1)) %>%
-    group_by(subject,phase,list) %>%
-    mutate(testOrder = 1:n()) %>% 
-    select(-order) %>%
-    rename(order=testOrder) %>%
-    ungroup() %>% 
-    complete(subject,class,order, cond_list, fill=list(score=0))
+raw_data <- CFR_allSs %>%
+  ungroup() %>%
+  filter(list != 0, score== 1,
+         phase=='final' | (phase=='prac' & practice =='T')) %>%
+  select_(.dots = c("subject","cond_list","class","target","resp","score","RT")) %>%
+  group_by(subject,class,cond_list) %>%
+  mutate(order = 1:n(),
+         RTrounded = round(RT,1)) %>%
+  ungroup() %>%
+  complete(subject, class, order, cond_list, fill=list(score=0))
+
+prob_atLeast_x <- raw_data %>%
+  group_by(subject, class, order) %>%
+  summarise(acc = mean(score)) %>%
+  ungroup()
+
+RT_byOutput_nRecalled <- raw_data %>%
+  group_by(subject, class, cond_list) %>%
+  summarise(nRecalled = sum(score)) %>%
+  ungroup() %>%
+  right_join(raw_data, by = c("subject", "class", "cond_list")) %>%
+  filter(!is.na(RT)) %>%
+  select(subject, class, cond_list, order, nRecalled, RT,RTrounded) %>%
+  arrange(subject, class, cond_list, order)
 
 ```
 
@@ -245,7 +263,8 @@ fpath <- file.path("..","data",paste(fname,'rds',sep='.'))
 model <- list(free = free,
               fixed =  params$fixed,
               obj = eval(parse(text=params$model)),
-              data = CFR_tested)
+              RT_observations = RT_byOutput_nRecalled,
+              accuracy_observations = prob_atLeast_x)
 
 if (params$routine =="minimize") {
   routine <- minimization_routine
@@ -283,7 +302,7 @@ if (params$routine =="minimize") {
   } else {
     
     results <- vector(mode='list', length =length(unique(model$data$subject)))
-    for (j in unique(model$data$subject)) {
+    for (j in unique(raw_data$subject)) {
       message(paste("Fitting subject", j))
       results[[j]] <-  try(routine(model))
     }
@@ -305,11 +324,54 @@ best_params <- lapply(results,function(x) {
   names(x) <- params$pars
   return(x) }
   )
-preds <- lapply(best_params, CFR_PCR, fixed = model$fixed, summarised=FALSE)
-dist <- bind_rows(lapply(lapply(preds, group_by, class,obsOrder),  RTdist),.id="subject")
-preds <- bind_rows(preds,.id="subject")
-dist$subject <- as.numeric(dist$subject)
-preds$subject <-  as.numeric(preds$subject)
+raw_predictions <-  bind_rows(lapply(best_params, CFR_PCR, fixed = model$fixed, summarised=FALSE),
+                              .id="subject") %>%
+  rename(order = obsOrder) %>%
+  mutate(subject = as.numeric(subject))
+```
+
+```{r SSdata}
+RT_preds <- raw_predictions %>%
+  filter(!is.na(order)) %>%
+  group_by(subject, class, nRecalled, order) %>%
+  summarise(RT = median(obsRT),
+            N = n()) %>%
+  ungroup() %>%
+  select(subject, class, order, nRecalled,  RT, N)
+
+# Summarise the RTs by collapsing across subjects
+RT_byOutput_nRecalled <- RT_byOutput_nRecalled %>%
+  group_by(subject, class, nRecalled, order) %>%
+  summarise(RT = median(RT, na.rm = TRUE),
+            N = n())
+
+RT_byOutput_nRecalled <- bind_rows(mutate(RT_preds, type = "model"),
+                                   mutate(RT_byOutput_nRecalled, type = "real"))
+rm(RT_preds)
+
+# To find the probability of recalling at least 1, 2, 3, ... 14, 15 items from the simulated
+# data, we count up how many observations we have at each possible output position (for each
+# subject in each condition )and divide it by the maximum number of times an observation at
+# that output position could have possibly been observed (which is equal to the number of
+# simulated lists).
+#
+# We remove simulated list items that were not recalled, since their output position is
+# not observed.
+#
+# For example, if we observed 7 outputs in the 14th position out of 1000 simulated lists, then
+# the probability of recalling at least 14 items would be 7/1000 = .007
+
+acc_preds <- raw_predictions %>%
+  filter(!is.na(order)) %>%
+  group_by(subject, class, order) %>%
+  summarise(acc = n()/params$fixed['nSim']) %>%  # max(sim) should equal nSims == 1000
+  ungroup() %>%
+  complete(subject, class, order, fill = list(acc = 0)) %>%
+  mutate(type = "model")
+
+prob_atLeast_x %<>% mutate(type="real") %>%
+  bind_rows(acc_preds)
+rm(acc_preds)
 ```
 
 # Fixed Specs
@@ -317,24 +379,6 @@ preds$subject <-  as.numeric(preds$subject)
 print(xtable(t(as.matrix(model$fixed)), digits=3,
              caption = paste("Fixed Parameters")),
       type = "html", include.rownames=FALSE, caption.placement="top")
-```
-
-
-```{r SSdata}
-preds_summary <- preds %>% 
-  group_by(subject) %>%
-  summarise_CFR_PCR()
-accData <- CFR_tested %>% 
-  group_by(subject,class,order) %>% 
-  summarise(acc = mean(score)) %>%
-  mutate(type="real",unrec =NA, timeout=NA) %>%
-  bind_rows(data.frame(select(preds_summary, -starts_with("RT")), type="model"))
-
-RTdata <- select(CFR_tested, subject,class, order,RT) %>%
-  mutate(type="real") %>%
-  rbind(data.frame(select(preds_summary,-acc,-unrec,-timeout, -RT, RT=RTcor),
-                   type="model"))
-  
 ```
 
 # Model Results by Subject
@@ -345,139 +389,95 @@ class_labels <- c(np = "No Practice",
 type_labels <- c(model = "PCR Model",
                  real = "Obs. Data")
 
-for (i in unique(preds$subject)) {
-  rtPlot <- ggplot(data =RTdata[RTdata$subject==i,],
-                   aes(x=factor(order),y=RT, group=type, color=type)) +
-    geom_point(position =position_jitter(width=.4),
-               data = filter(RTdata, subject == i, type == 'real')) +
-    geom_point(data = filter(RTdata, subject == i, type == 'model')) + 
-    geom_line(data = filter(RTdata, subject == i, type == 'model'),
-              linetype=2) +
-    facet_grid(. ~ class, labeller = labeller(class = class_labels)) +
+for (i in unique(raw_predictions$subject)) {
+  rtPlot <- ggplot(data = filter(RT_byOutput_nRecalled, subject==i),
+                   aes(x=factor(order),
+                       y=RT,
+                       group = nRecalled,
+                       color = factor(nRecalled))) +
+    geom_point() +
+    geom_line() +
+    facet_grid(class ~ type, labeller = labeller(class = class_labels,
+                                                 type = type_labels)) +
     scale_y_continuous("Median Inter-Retreival Time of Item x") +
     scale_x_discrete("Output Postion (x)") +
-    scale_linetype_discrete(name="",breaks = c(PCR='model',Obs. = 'real')) + 
+    scale_color_discrete("Items Recalled") +
     ggtitle("Data vs. PCR: Reaction Time")
   
-  accPlot <- ggplot(data =accData[accData$subject==i,],
-                   aes(y=acc, x=factor(order),group=type,linetype=type)) +
-    geom_segment(aes(x=factor(order), y=acc, xend = order, yend = acc+unrec,
-                     color='unrec'),size=1) +
-    geom_segment(aes(x=factor(order), acc+unrec, xend = order, yend = acc+unrec+timeout,
-                     color='timeout'),size=1) +    
+  accPlot <- ggplot(filter(prob_atLeast_x, subject==i),
+                   aes(x=factor(order), y=acc, group=type, linetype=type)) +
     geom_point() +
-    geom_line() +    
-    facet_grid(. ~ class, labeller = labeller(class = class_labels)) +
-    scale_color_discrete("Failure Mode", labels=c("Timed Out","Unrecoverable")) +
+    geom_line() +
+    facet_grid(class ~ ., labeller = labeller(class = class_labels)) +
     scale_y_continuous("Probability of Recalling at Least x Items") +  
     scale_x_discrete("Output Position (x)") + 
-    scale_linetype_discrete(name="",breaks = c(PCR='model',Obs. = 'real')) + 
+    scale_linetype_discrete(name="", labels = c(model = "PCR Model",
+                                                real = "Obs. Data")) +
     ggtitle("Data vs. PCR: Accuracy")
-  
-  densityPlot <- ggplot(data =dist[dist$subject==i,],aes(x=RT,y=y)) + 
-    geom_line(size=.75) +
-    facet_grid(class~order) +
-    geom_point(data = CFR_tested[CFR_tested$subject==i,],
-               mapping=aes(x=RT),y=0,color="blue") + 
-    scale_x_continuous(limits=c(0,max(CFR_tested$RTrounded[CFR_tested$subject==i]+5,
-                                      na.rm=TRUE))) + 
-    theme(axis.text.x = element_text(size=rel(1))) + 
-    ggtitle("Model Density")
-  
+
   cat(paste("<h4 class='subid'>","Subject ", i, "</h4>",sep=""))
-  print(xtable(t(data.frame(free[i])), digits=3, caption = paste("Starting Parameters")),
+  print(xtable(t(data.frame(free[[i]])), digits=3, caption = paste("Starting Parameters")),
           type = "html", include.rownames=FALSE, caption.placement="top")    
   print(xtable(results[[i]], digits=3, caption = paste("Best Parameters")),
           type = "html", include.rownames=FALSE, caption.placement="top")    
   print(accPlot)
   print(rtPlot)
-  print(densityPlot)
 
 }
 ```
 
 # Averaged Results
-
-```{r averages,results='asis'}
-aggAccData <- accData %>% 
-    group_by(class,order,type) %>% 
+```{r condition_averages}
+prob_atLeast_x %<>% group_by(class,order,type) %>%
     summarise(sd = sd(acc),
               acc = mean(acc),
-              count = n())
+              nSubs = n())
 
-aggRTdata <- CFR_tested %>%
-  select(subject,class, order,RT) %>%
-  mutate(type="real") %>%
-  rbind(data.frame(select(preds_summary,-acc,-unrec,-timeout, -RT, RT=RTcor),
-                   type="model")) %>% 
-  group_by(class,order,type) %>%
-  summarise(MAD =mad(RT,na.rm=T,constant = 1),
-            RT = median(RT,na.rm=TRUE))
+RT_byOutput_nRecalled %<>%
+  group_by(class, order, nRecalled, type) %>%
+    summarise(MAD = mad(RT, constant = 1),
+              RT = median(RT),
+              nSubs = n())
+```
 
-aggDist <- dist %>% 
-  group_by(class,order,RT) %>%
-  summarise(y = mean(y))
-  
-aggAccPlot <- ggplot(data =aggAccData,
-                     aes(x=factor(order), y=acc, linetype=type)) +
-  geom_point(size=2) +
-  geom_line(aes(group=interaction(class,type)),size=.75) +
-  geom_errorbar(aes(ymin = acc - sd/sqrt(count), 
-                    ymax =acc + sd/sqrt(count),
-                    group=interaction(class,type)),
+```{r condition_averages_plots,results='asis'}
+rtPlot %+% RT_byOutput_nRecalled +
+  geom_point() +
+  geom_errorbar(aes(ymin = RT - MAD,
+                    ymax = RT + MAD),
                 linetype=1,
-                width=.3) +
-  facet_grid(. ~ class, labeller = labeller(class = class_labels)) +
-  scale_y_continuous("Proportion of Occurance") +  
-  scale_x_discrete("Output Position (x)") + 
-  scale_linetype_discrete(name="",breaks = c(PCR='model',Obs. = 'real')) + 
-  ggtitle("Data vs. PCR: Accuracy")
-
-aggRTPlot <- ggplot(data = aggRTdata,
-                    aes(x=factor(order), y=RT, linetype=type, color = class)) +
-  geom_point(size=2) +
-  geom_line(aes(group=interaction(class,type)),size=.75) +
-  geom_errorbar(aes(ymin = RT-(1*MAD), ymax = RT+(1*MAD),
-                    group=interaction(class,type)),
-                linetype=1,
-                width=.3) +
-  facet_grid(class ~ ., labeller = labeller(class = class_labels)) +
-  scale_y_continuous("Median Inter-Retreival Time of Item x") +
-  scale_x_discrete("Output Postion (x)") +
-  scale_color_manual(name="Condition", guide=FALSE,
-                     labels=c("Baseline","Restudy","Test Practice"),
-                     values = c('black', 'red', '#00b300')) +   
-  scale_linetype_discrete(name="",breaks = c('model','real'),
-                          labels=c("PCR Model", "Obs. Data")) + 
-  ggtitle("Data vs. PCR: Reaction Time")
+                width=.3)
   
-aggDensityPlot <-  densityPlot %+% aggDist +
-    ggtitle("Average Model Density")  
-
-print(aggAccPlot)
-print(aggRTPlot)
-print(aggDensityPlot)
+accPlot %+% prob_atLeast_x +
+  geom_errorbar(aes(ymin = acc - sd/sqrt(nSubs),
+                    ymax = acc + sd/sqrt(nSubs)),
+                  linetype=1,
+                  width=.3)
 
 avg_res <- summarise_each(do.call(rbind,results),funs(mean))
 print(xtable(as.matrix(avg_res[1:which(names(avg_res)=='value')]),
              digits=3, caption = paste("Average Parameters")),
         type = "html", include.rownames=FALSE, caption.placement="top")
+```
 
-aggAccPlot_byType <- ggplot(data =aggAccData,
-                     aes(x=factor(order), y=acc, color=class)) +
-  geom_point(size=2) +
-  geom_line(aes(group=interaction(class,type)),size=.75) +
-  geom_errorbar(aes(ymin = acc - sd/sqrt(count), 
-                    ymax =acc + sd/sqrt(count),
-                    group=interaction(class,type)),
-                linetype=1,
-                width=.3) +
-  facet_grid(. ~ type,  labeller = labeller(type = type_labels)) +
-  scale_y_continuous("Probability of Recalling at Least x Items") +  
-  scale_x_discrete("Output Position (x)") + 
-  scale_color_manual(name="Condition",
-                     labels=c("Baseline","Restudy","Test Practice"),
-                     values = c('black', 'red', '#00b300')) +  
-  ggtitle("Data vs. PCR: Output Accuracy") + 
-  theme(axis.text.x = element_text(size = rel(1.75)))
+
+```{r test, eval=FALSE}
+x <- RT_preds %>%
+  group_by(class, order, nRecalled) %>%
+  summarise(count = n(),
+            MAD = mad(RT,na.rm=T,constant = 1),
+            median_RT = median(RT,na.rm=TRUE),
+            mean_RT = mean(RT,na.rm=TRUE),
+            sd_RT = sd(RT,na.rm=TRUE))
+forward <- ggplot(filter(x, nRecalled > 2),
+                  aes(x=order, y=mean_RT, color=factor(nRecalled))) +
+  geom_point() +
+  geom_line(size = .75) +
+  facet_grid(class~., labeller = labeller(class_labels)) +
+  scale_x_continuous(breaks = 1:15) +
+  scale_color_discrete("Items Recalled") +
+  ylab("Mean IRT") +
+  xlab("Output Order") +
+  ggtitle("Forward IRTs by Recall Total")
+print(forward)
 ```
