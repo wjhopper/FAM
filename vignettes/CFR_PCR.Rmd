@@ -316,11 +316,12 @@ print(xtable(t(as.matrix(model$fixed)), digits=3,
 preds_summary <- preds %>% 
   group_by(subject) %>%
   summarise_CFR_PCR()
+
 accData <- CFR_tested %>% 
   group_by(subject,class,order) %>% 
   summarise(acc = mean(score)) %>%
   mutate(type="real",unrec =NA, timeout=NA) %>%
-  rbind(data.frame(select(preds_summary, -starts_with("RT")), type="model"))
+  bind_rows(data.frame(select(preds_summary, -starts_with("RT")), type="model"))
 
 RTdata <- select(CFR_tested, subject,class, order,RT) %>%
   mutate(type="real") %>%
