@@ -35,31 +35,6 @@ library(optimx)
 ```
 
 ```{r functions}
-classLabeller <- function(variable,value) {   
-  classNames <- list(
-    'np'="No Practice",
-    'sp'="Study Practice",
-    'tp'="Test Practice"
-  )      
-  if (variable=='class') {
-    return(classNames[value])
-  } else {
-    return(value)
-  }
-}
-
-typeLabeller <- function(variable,value) {   
-  typeNames <- list(
-    'model'="PCR Model"  ,  
-    'real'="Obs. Data"
-  )      
-  if (variable=='type') {
-    return(typeNames[value])
-  } else {
-    return(value)
-  }
-}
-
 study_beta <- function(mem, nFeatures, LR, FR = NULL) {
 
   mxn <- prod(dim(mem))
@@ -356,6 +331,11 @@ RTdata <- select(CFR_tested, subject,class, order,RT) %>%
 
 # Model Results by Subject
 ```{r subject_performance,results='asis'}
+class_labels <- c(np = "No Practice",
+                  sp = "Study Practice",
+                  tp = "Test Practice")
+type_labels <- c(model = "PCR Model",
+                 real = "Obs. Data")
 
 for (i in unique(preds$subject)) {
   rtPlot <- ggplot(data =RTdata[RTdata$subject==i,],
@@ -365,7 +345,7 @@ for (i in unique(preds$subject)) {
     geom_point(data = filter(RTdata, subject == i, type == 'model')) + 
     geom_line(data = filter(RTdata, subject == i, type == 'model'),
               linetype=2) +
-    facet_grid(. ~ class,labeller = classLabeller) +
+    facet_grid(. ~ class, labeller = labeller(class = class_labels)) +
     scale_y_continuous("Median Inter-Retreival Time of Item x") +
     scale_x_discrete("Output Postion (x)") +
     scale_linetype_discrete(name="",breaks = c(PCR='model',Obs. = 'real')) + 
@@ -379,7 +359,7 @@ for (i in unique(preds$subject)) {
                      color='timeout'),size=1) +    
     geom_point() +
     geom_line() +    
-    facet_grid(. ~ class,labeller = classLabeller) +
+    facet_grid(. ~ class, labeller = labeller(class = class_labels)) +
     scale_color_discrete("Failure Mode", labels=c("Timed Out","Unrecoverable")) +
     scale_y_continuous("Probability of Recalling at Least x Items") +  
     scale_x_discrete("Output Position (x)") + 
@@ -439,7 +419,7 @@ aggAccPlot <- ggplot(data =aggAccData,
                     group=interaction(class,type)),
                 linetype=1,
                 width=.3) +
-  facet_grid(. ~ class,labeller = classLabeller) +
+  facet_grid(. ~ class, labeller = labeller(class = class_labels)) +
   scale_y_continuous("Proportion of Occurance") +  
   scale_x_discrete("Output Position (x)") + 
   scale_linetype_discrete(name="",breaks = c(PCR='model',Obs. = 'real')) + 
@@ -453,7 +433,7 @@ aggRTPlot <- ggplot(data = aggRTdata,
                     group=interaction(class,type)),
                 linetype=1,
                 width=.3) +
-  facet_grid(class ~ .,labeller = classLabeller) +
+  facet_grid(class ~ ., labeller = labeller(class = class_labels)) +
   scale_y_continuous("Median Inter-Retreival Time of Item x") +
   scale_x_discrete("Output Postion (x)") +
   scale_color_manual(name="Condition", guide=FALSE,
@@ -484,7 +464,7 @@ aggAccPlot_byType <- ggplot(data =aggAccData,
                     group=interaction(class,type)),
                 linetype=1,
                 width=.3) +
-  facet_grid(. ~ type, labeller = typeLabeller) +
+  facet_grid(. ~ type,  labeller = labeller(type = type_labels)) +
   scale_y_continuous("Probability of Recalling at Least x Items") +  
   scale_x_discrete("Output Position (x)") + 
   scale_color_manual(name="Condition",
