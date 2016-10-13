@@ -262,6 +262,8 @@ if (params$routine =="minimize") {
 ```
 
 ```{r load_or_fit,include=FALSE}
+subjects <- unique(raw_data$subject)
+
  if (!file.exists(fpath))  {
   
   if (params$inpar) {
@@ -274,9 +276,9 @@ if (params$routine =="minimize") {
     cat(paste('[',Sys.time(),']',"INIT parlog"),
         file=logfile, sep='\n')
     clusterExport(cluster$handle,c("accuracyErrorFcn", "RT_ErrorFcn","routine"))
-    results <- foreach(j =unique(model$data$subject), .verbose=T,
-                             .packages=c("optimx","PCR","whoppeR",
-                                         "dplyr","FAM","reshape2","tidyr"))  %dopar% {
+    results <- foreach(j = subjects, .verbose=T,
+                       .packages=c("optimx","PCR","whoppeR",
+                                   "dplyr","FAM","reshape2","tidyr"))  %dopar% {
       sink(logfile, append=TRUE)
       cat(paste("Fitting subject", j,"\n"))
       results <- try(routine(model))
@@ -288,9 +290,9 @@ if (params$routine =="minimize") {
     cat(paste('[',Sys.time(),']',"Finished Fitting"),
         file=logfile,sep='\n')
   } else {
-    
-    results <- vector(mode='list', length =length(unique(model$data$subject)))
-    for (j in unique(raw_data$subject)) {
+
+    results <- vector(mode='list', length = length(subjects))
+    for (j in subjects) {
       message(paste("Fitting subject", j))
       results[[j]] <-  try(routine(model))
     }
