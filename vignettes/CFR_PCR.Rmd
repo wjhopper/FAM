@@ -260,10 +260,13 @@ fname <- paste(mname[length(mname)],
                sep="_")
 fpath <- file.path("..","data",paste(fname,'rds',sep='.'))
 
+# Filter RTs to those between 2.5th and 97.5th percentile
+# So we don't fit the most extreme RT points
 model <- list(free = free,
               fixed =  params$fixed,
               obj = eval(parse(text=params$model)),
-              RT_observations = RT_byOutput_nRecalled,
+              RT_observations = filter(RT_byOutput_nRecalled,
+                                       RT < quantile(RT, .975) & RT > quantile(RT, .025)),
               accuracy_observations = prob_atLeast_x)
 
 if (params$routine =="minimize") {
