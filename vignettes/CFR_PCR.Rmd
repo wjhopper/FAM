@@ -13,7 +13,7 @@ params:
   model: FAM::CFR_PCR
   routine: test
   pars: !r c("ER","LR","Ta","TR","Tmin","Tmax","lambda")
-  fixed: !r c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90)
+  fixed: !r c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90, NDTrate=1)
 ---
 
 ```{r setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
@@ -99,8 +99,8 @@ accuracyErrorFcn <- function(free, fixed, accuracy_observations, fcn = CFR_PCR, 
 }
 
 RT_ErrorFcn <- function(free, fixed, RT_observations, fcn = CFR_PCR, ...) {
-  
-  if (!paramBounds(c(free,fixed)) | anyNA(c(free,fixed))) {
+  p <- c(free,fixed)
+  if (!paramBounds(p) | anyNA(p)) {
     return(1000000)
   }
   preds <- fcn(free=free, fixed=fixed, summarised = FALSE)
@@ -113,7 +113,7 @@ RT_ErrorFcn <- function(free, fixed, RT_observations, fcn = CFR_PCR, ...) {
                                nRecalled == data_point$nRecalled,
                                obsRT <=  data_point$RT)
     evaluation_points <- data_point$RT - predicted_points$obsRT
-    likelihood <- likelihood + sum(dexp(evaluation_points, rate = 1, log = TRUE))
+    likelihood <- likelihood + sum(dexp(evaluation_points, rate = p['NDTrate'], log = TRUE))
   }
 
   return(likelihood)
