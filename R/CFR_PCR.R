@@ -95,6 +95,11 @@ CFR_PCR <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda
            obsOrder = replace(obsOrder, acc==FALSE, NA)) %>%
     select(-rec)
 
+  preds <- preds %>%
+    group_by(class, sim) %>%
+    summarise(nRecalled = sum(acc)) %>%
+    left_join(preds, by = c("class", "sim"))
+
   # Check summarise switch
   if (summarised) {
     preds <- preds %>%
