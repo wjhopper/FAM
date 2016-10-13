@@ -274,6 +274,8 @@ if (params$routine =="minimize") {
 ```
 
 ```{r load_or_fit,include=FALSE}
+subjects <- unique(raw_data$subject)
+
  if (!file.exists(fpath))  {
   
   if (params$inpar) {
@@ -285,7 +287,7 @@ if (params$routine =="minimize") {
     clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine",
                                     "paramBounds","study_beta", "test_beta",
                                     "model", "CFR_PCR", "RTdist"))
-    results <- foreach(j = unique(model$data$subject), .verbose=T,
+    results <- foreach(j = subjects, .verbose=T,
                        .packages=c("optimx","PCR","whoppeR", "magrittr",
                                    "dplyr","reshape2","tidyr"))  %dopar% {
 
@@ -300,9 +302,9 @@ if (params$routine =="minimize") {
         file=cluster$logfile, sep='\n')
     
   } else {
-    
-    results <- vector(mode='list', length =length(unique(model$data$subject)))
-    for (j in unique(raw_data$subject)) {
+
+    results <- vector(mode='list', length = length(subjects))
+    for (j in subjects) {
       message(paste("Fitting subject", j))
       results[[j]] <-  try(routine(model))
     }
