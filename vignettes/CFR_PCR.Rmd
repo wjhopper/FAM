@@ -319,15 +319,12 @@ if (params$routine =="minimize") {
 ```
 
 ```{r unlist_and_extract}
-best_params <- lapply(results,function(x) {
-  x <- as.vector(coef(x))
-  names(x) <- params$pars
-  return(x) }
-  )
-raw_predictions <-  bind_rows(lapply(best_params, CFR_PCR, fixed = model$fixed, summarised=FALSE),
-                              .id="subject") %>%
-  rename(order = obsOrder) %>%
-  mutate(subject = as.numeric(subject))
+raw_predictions <- lapply(results, function(x) {
+  CFR_PCR(free = coef(x)[1,], fixed = model$fixed, summarised=FALSE)
+  }) %>%
+  bind_rows(.id="subject") %>%
+  mutate(subject = as.numeric(subject)) %>%
+  rename(order = obsOrder)
 ```
 
 ```{r SSdata}
