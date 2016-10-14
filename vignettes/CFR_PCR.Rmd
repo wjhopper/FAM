@@ -278,28 +278,25 @@ subjects <- unique(raw_data$subject)
  if (!file.exists(fpath))  {
   
   if (params$inpar) {
-    cluster <- tryDoParallelCluster(detectCores()-1)
-  }
-  
-  if (params$inpar && cluster$success) {
-    logfile <- tempfile("parlog", fileext = ".txt")
-    message(paste("Log at", logfile))
+    
+    cluster <- doParallelCluster(detectCores()-1)
+    message(paste("Log at", cluster$logfile))
     cat(paste('[',Sys.time(),']',"INIT parlog"),
-        file=logfile, sep='\n')
-    clusterExport(cluster$handle,c("accuracyErrorFcn", "RT_ErrorFcn","routine"))
+        file=cluster$logfile, sep='\n')
+    clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine"))
     results <- foreach(j = subjects, .verbose=T,
                        .packages=c("optimx","PCR","whoppeR",
                                    "dplyr","FAM","reshape2","tidyr"))  %dopar% {
-      sink(logfile, append=TRUE)
+      sink(cluster$logfile, append=TRUE)
       cat(paste("Fitting subject", j,"\n"))
       results <- try(routine(model))
       sink()
       results
-      }
+    }
     
     stopCluster(cluster$handle)
     cat(paste('[',Sys.time(),']',"Finished Fitting"),
-        file=logfile,sep='\n')
+        file=cluster$logfile, sep='\n')
   } else {
 
     results <- vector(mode='list', length = length(subjects))
