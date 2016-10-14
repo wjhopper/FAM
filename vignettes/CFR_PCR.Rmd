@@ -101,22 +101,33 @@ accuracyErrorFcn <- function(free, fixed, accuracy_observations, fcn = CFR_PCR, 
 RT_ErrorFcn <- function(free, fixed, RT_observations, fcn = CFR_PCR, ...) {
   p <- c(free,fixed)
   if (!paramBounds(p) | anyNA(p)) {
-    return(1000000)
+    return(.Machine$double.xmax)
   }
+  
   preds <- fcn(free=free, fixed=fixed, summarised = FALSE)
-  likelihood <- 0
+  likelihood <- vector(mode = "numeric", length = nrow(RT_observations))
+  
   for (i in 1:nrow(RT_observations)) {
     data_point <- RT_observations[i,]
     predicted_points <- filter(preds,
                                class == data_point$class,
                                obsOrder == data_point$order,
                                nRecalled == data_point$nRecalled,
-                               obsRT <=  data_point$RT)
-    evaluation_points <- data_point$RT - predicted_points$obsRT
-    likelihood <- likelihood + sum(dexp(evaluation_points, rate = p['NDTrate'], log = TRUE))
+                               obsRT <=  data_point$RT) %>%
+      use_series(obsRT)
+    
+    if (length(predicted_points) != 0) {
+      
+      evaluation_points <- data_point$RT - predicted_points
+      likelihood[i] <- -sum(dexp(x = evaluation_points,
+                                rate = p['NDTrate'],
+                                log = TRUE))
+    } else {
+       likelihood[i] <- 1000000
+    }
   }
 
-  return(likelihood)
+  return(sum(likelihood))
 }
 
 minimization_routine <- function(model, erf = RT_ErrorFcn) {
