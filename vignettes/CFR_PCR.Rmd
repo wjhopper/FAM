@@ -37,18 +37,14 @@ library(optimx)
 study_beta <- function(mem, nFeatures, LR, FR = NULL) {
 
   mxn <- prod(dim(mem))
-  mem[nFeatures - mem  < 1] <- nFeatures-1
+  mem[nFeatures - mem  < 1] <- nFeatures-1.1
   toGo <- nFeatures - mem
-  binomVAR <- toGo*LR*(1-LR)
-  binomM <- toGo*LR
-  beta_pars <- betaParams(mean = binomM/toGo, sd = sqrt(binomVAR/(toGo^2)))
+  beta_pars <- betaParams(mean = LR, sd = sqrt((LR*(1-LR))/toGo))
   mem <- mem + (rbeta(mxn, beta_pars$a, beta_pars$b) * toGo)
 
   if (!is.null(FR) && FR != 0) {
     mem[mem < 1] <- 1
-    binomVAR <-  mem*FR*(1-FR)
-    binomM <-  mem*FR
-    beta_pars <- betaParams(mean = binomM/mem, sd = sqrt(binomVAR/(mem^2)))
+    beta_pars <- betaParams(mean = FR, sd = sqrt((FR*(1-FR))/mem))
     mem <- mem - (rbeta(mxn, beta_pars$a, beta_pars$b) * mem)
   }
 
@@ -61,26 +57,22 @@ test_beta <- function(mem, nFeatures, thresh, acc, LR, TR, FR=NULL) {
   nCor = sum(acc)
 
   # memory feature updating
-  mem[nFeatures - mem < 1] <- nFeatures-1
+  mem[nFeatures - mem < 1] <- nFeatures-1.1
   toGo <-nFeatures - mem
   binomVAR <- toGo*LR*(1-LR)
   binomM <- toGo*LR
-  beta_pars <- betaParams(mean = binomM/toGo, sd = sqrt(binomVAR/(toGo^2)))
+  beta_pars <- betaParams(mean = LR, sd = sqrt((LR*(1-LR))/toGo))
   mem[acc] <- mem[acc] + (rbeta(nCor, beta_pars$a, beta_pars$b) * toGo[acc])
 
   # threshold updating
   thresh[thresh < 1] <- 1
-  binomVAR <- thresh*TR*(1-TR)
-  binomM <-  thresh*TR
-  beta_pars <- betaParams(mean = binomM/thresh, sd = sqrt(binomVAR/thresh^2))
+  beta_pars <- betaParams(mean = TR, sd = sqrt(TR*(1-TR)/thresh))
   thresh[acc] <- thresh[acc] - (rbeta(nCor, beta_pars$a[acc], beta_pars$b[acc])
                                * thresh[acc])
 
   if (!is.null(FR) && FR != 0) {
     mem[mem < 1] <- 1
-    binomVAR <-  mem*FR*(1-FR)
-    binomM <-  mem*FR
-    beta_pars <- betaParams(mean = binomM/mem, sd = sqrt(binomVAR/(mem^2)))
+    beta_pars <- betaParams(mean = FR, sd = sqrt((FR*(1-FR))/mem))
     mem <- mem - (rbeta(mxn, beta_pars$a, beta_pars$b) * mem)
   }
 
