@@ -9,8 +9,8 @@ output:
     toc_depth: 4
     css: custom.css
 params:
-  inpar: TRUE
-  model: FAM::CFR_PCR
+  inpar: FALSE
+  model: CFR_PCR
   routine: test
   pars: !r c("ER","LR","Ta","TR","Tmin","Tmax","lambda", "NDTrate")
   fixed: !r c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90)
@@ -24,7 +24,7 @@ library(magrittr)
 # library(FAM)
 devtools::load_all() # at least SHA b9ea7e8
 # devtools::load_all("../PCR") # SHA fdc8a07b
-# library(PCR)
+library(PCR)
 library(reshape2)
 library(whoppeR)
 library(grid)
@@ -78,6 +78,100 @@ test_beta <- function(mem, nFeatures, thresh, acc, LR, TR, FR=NULL) {
   }
 
   return(list(mem = mem,thresh = thresh))
+}
+
+CFR_PCR <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda=.8),
+                    fixed = c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
+                    summarised = TRUE) {
+
+  p <- c(free,fixed)
+  if (!paramBounds(p)) {
+    stop("Parameter out of allowed range")
+  }
+
+  set.seed(456)
+  mxn <-  p['nSim']*p['nList'] #dimensions precalculation
+
+  # we want to sample from a beta distribution with the same
+  # mean and sd as binomial(N = nFeat,p=ER) distribution.
+  # The problem is that the binomial is [0,nFeat], and the equations we
+  # to solve for beta distributions alpha and beta from mean and sd
+  # are for beta bounded between zero and 1 aka the 2 parameter beta.
+  # So we need to divide the mean and varianace of the binomial by nFeat
+  # and nFeat^2. Then we can use our equations, and multiply by nFeat after sampling
+
+  binomVAR <- p['nFeat']*p['ER']*(1-p['ER'])
+  binomM <- p['nFeat']*p['ER']
+  beta_pars = betaParams(mean = binomM/p['nFeat'],
+                               sd = sqrt(binomVAR/p['nFeat']^2))
+  mem <- matrix(rbeta(mxn, beta_pars$a, beta_pars$b),
+                nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
+  thresh <- matrix(rbeta(mxn, p['Ta'],  p['Ta']),
+                   nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
+
+  # practice test
+  prac <- freeRecall(mem,thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
+                     Time = p['Time'], lambda=p['lambda'])
+
+  # study practice
+  restudyStrengths <- study_beta(mem=mem, nFeatures=p['nFeat'],
+                            LR = p['LR'], FR = p['FR'])
+  restudy<-freeRecall(restudyStrengths, thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
+                      Time = p['Time'], lambda=p['lambda'])
+
+  # test practice
+  testStrengths <- test_beta(mem=mem,  nFeatures=p['nFeat'],
+                        thresh = thresh, acc = prac$Acc, LR = p['LR'],
+                        TR = p['TR'], FR = p['FR'])
+  tested <- freeRecall(testStrengths$mem, testStrengths$thresh,
+                     Tmin = p['Tmin'], Tmax = p['Tmax'],
+                     Time = p['Time'], lambda=p['lambda'])
+
+  # Putting the output together
+  order <- rbind(prac$order,restudy$order,tested$order)
+  RT <-rbind(prac$RT,restudy$RT,tested$RT)
+  RTcor <- rbind(prac$RTcor,restudy$RTcor,tested$RTcor)
+  rec <- rbind(prac$recoverable,restudy$recoverable,tested$recoverable)
+  acc <- rbind(prac$Acc,restudy$Acc,tested$Acc)
+
+  # Sorting the output
+  for (x in 1:(p['nSim']*3)) {
+    RT[x,] <- RT[x,order[x,]]
+    RTcor[x,] <- RTcor[x,order[x,]]
+    rec[x,] <- rec[x,order[x,]]
+    acc[x,] <- acc[x,order[x,]]
+  }
+
+  # Reshaping the output
+  acc <-melt(acc, varnames=c("class","memOrder"),value.name = "acc")
+  RT <- melt(RT, varnames=c("class","memOrder"),value.name = "memRT")
+  RTcor <- melt(RTcor, varnames=c("class","memOrder"),value.name = "obsRT")
+  rec <- melt(rec, varnames=c("class","memOrder"),value.name = "rec")
+
+  preds <- Reduce(function(x,y) left_join(x,y, by = c("class", "memOrder")),
+                  x=list(acc,RT,RTcor,rec)) %>%
+    mutate(class =  rep(rep(c("np","sp","tp"), each = nrow(prac$Acc)),
+                        ncol(prac$Acc)),
+           sim  = rep(1:p['nSim'], times = p['nList']*3),
+           unrec = !rec & !acc,
+           timeout = !acc & rec) %>%
+    group_by(class,sim,acc) %>%
+    mutate(obsOrder = 1:n(),
+           obsOrder = replace(obsOrder, acc==FALSE, NA)) %>%
+    select(-rec)
+
+  preds <- preds %>%
+    group_by(class, sim) %>%
+    summarise(nRecalled = sum(acc)) %>%
+    left_join(preds, by = c("class", "sim"))
+
+  # Check summarise switch
+  if (summarised) {
+    preds <- preds %>%
+      ungroup() %>%
+      summarise_CFR_PCR()
+  }
+  return(preds)
 }
 
 accuracyErrorFcn <- function(free, fixed, accuracy_observations, fcn = CFR_PCR, ...) {
@@ -275,10 +369,10 @@ subjects <- unique(raw_data$subject)
     message(paste("Log at", cluster$logfile))
     cat(paste('[',Sys.time(),']',"INIT parlog"),
         file=cluster$logfile, sep='\n')
-    clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine"))
+    clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine", "CFR_PCR"))
     results <- foreach(j = subjects, .verbose=T,
-                       .packages=c("optimx","PCR","whoppeR",
-                                   "dplyr","FAM","reshape2","tidyr"))  %dopar% {
+                       .packages=c("optimx","PCR","whoppeR", "magrittr",
+                                   "dplyr","reshape2","tidyr"))  %dopar% {
       sink(cluster$logfile, append=TRUE)
       cat(paste("Fitting subject", j,"\n"))
       results <- try(routine(model))
@@ -289,6 +383,7 @@ subjects <- unique(raw_data$subject)
     stopCluster(cluster$handle)
     cat(paste('[',Sys.time(),']',"Finished Fitting"),
         file=cluster$logfile, sep='\n')
+    
   } else {
 
     results <- vector(mode='list', length = length(subjects))
