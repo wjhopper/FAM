@@ -11,9 +11,9 @@ output:
 params:
   inpar: FALSE
   model: CFR_PCR
-  routine: test
-  pars: !r c("ER","LR","Ta","TR","Tmin","Tmax","lambda", "NDTrate")
-  fixed: !r c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90)
+  routine: minimize
+  pars: !r c("ER","LR","Ta","TR","Tmin","Tmax","lambda","stop")
+  fixed: !r c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90, NDTrate=1)
 ---
 
 ```{r setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
@@ -23,8 +23,6 @@ library(dplyr)
 library(magrittr)
 # library(FAM)
 devtools::load_all() # at least SHA b9ea7e8
-# devtools::load_all("../PCR") # SHA fdc8a07b
-library(PCR)
 library(reshape2)
 library(whoppeR)
 library(grid)
@@ -103,29 +101,34 @@ CFR_PCR <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda
   binomVAR <- p['nFeat']*p['ER']*(1-p['ER'])
   binomM <- p['nFeat']*p['ER']
   beta_pars = betaParams(mean = binomM/p['nFeat'],
-                               sd = sqrt(binomVAR/p['nFeat']^2))
+                         sd = sqrt(binomVAR/p['nFeat']^2))
   mem <- matrix(rbeta(mxn, beta_pars$a, beta_pars$b),
                 nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
   thresh <- matrix(rbeta(mxn, p['Ta'],  p['Ta']),
                    nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
 
   # practice test
-  prac <- freeRecall(mem,thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
-                     Time = p['Time'], lambda=p['lambda'])
+  prac <- freeRecall(mem, thresh,
+                     Tmin = p['Tmin'], Tmax = p['Tmax'],
+                     Time = p['Time'], lambda=p['lambda'],
+                     stop = p["stop"])
 
   # study practice
   restudyStrengths <- study_beta(mem=mem, nFeatures=p['nFeat'],
-                            LR = p['LR'], FR = p['FR'])
-  restudy<-freeRecall(restudyStrengths, thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
-                      Time = p['Time'], lambda=p['lambda'])
+                                 LR = p['LR'], FR = p['FR'])
+  restudy<-freeRecall(restudyStrengths, thresh,
+                      Tmin = p['Tmin'], Tmax = p['Tmax'],
+                      Time = p['Time'], lambda=p['lambda'],
+                      stop = p["stop"])
 
   # test practice
   testStrengths <- test_beta(mem=mem,  nFeatures=p['nFeat'],
-                        thresh = thresh, acc = prac$Acc, LR = p['LR'],
-                        TR = p['TR'], FR = p['FR'])
+                             thresh = thresh, acc = prac$Acc, LR = p['LR'],
+                             TR = p['TR'], FR = p['FR'])
   tested <- freeRecall(testStrengths$mem, testStrengths$thresh,
-                     Tmin = p['Tmin'], Tmax = p['Tmax'],
-                     Time = p['Time'], lambda=p['lambda'])
+                       Tmin = p['Tmin'], Tmax = p['Tmax'],
+                       Time = p['Time'], lambda=p['lambda'],
+                       stop = p["stop"])
 
   # Putting the output together
   order <- rbind(prac$order,restudy$order,tested$order)
@@ -267,6 +270,62 @@ paramBounds <- function(p) {
   }
 }
 
+
+freeRecall <- function(mem, thresh, space=NULL,Tmin=NULL,Tmax=NULL,
+                       Time=NULL,lambda=NULL,stop=NULL) {
+  if (is.null(time)) {
+    recalled <- mem >= thresh
+    serialOrder <- t(apply(mem,1, order, decreasing = TRUE))
+    return(list(Acc=recalled, order=serialOrder))
+
+  } else {
+
+    # Preallocate return structures
+    RT <- matrix(NA, nrow = nrow(mem), ncol = ncol(mem))
+    RTcor <- matrix(NA, nrow = nrow(mem), ncol = ncol(mem))
+    serialOrder <- matrix(NA, nrow = nrow(mem), ncol = ncol(mem))
+    recalled <- matrix(FALSE, nrow = nrow(mem), ncol = ncol(mem))
+    recoverable <- matrix(FALSE, nrow =nrow(mem), ncol = ncol(mem))
+    for (i in 1:nrow(RT)) {
+
+      # Find search order, and reverse indices
+      ord <- order(mem[i,],decreasing=TRUE) # mem order
+      reverseOrd <- order(ord) # sim order
+
+      # Calculate RT and accuracy
+      rt <- Tmin + (Tmax-Tmin)*exp(-lambda*abs(mem[i,]-thresh[i,])) # rt in sim order
+      crt <- cumsum(rt[ord]) # crt in mem order
+      rec <- (mem[i,]  >= thresh[i,])[ord] # rec in mem order
+      acc <- crt < Time & rec # acc in mem order
+      rt_cor <- c(first(crt[acc],default = numeric(0)), diff(crt[acc])) # rt_cor in mem order
+      
+      ## Implement stopping rule
+      ## If any IRT's are above the "how long I'll keep trying" threshold, everything after
+      ## is not recalled, so set all following elements in acc to be FALSE, and all following
+      ## elements in rt_cor to be NA
+      
+      if (any(rt_cor > stop)) {
+        give_up <- which(rt_cor > stop)[1]
+        acc[give_up:length(acc)] <- FALSE
+        rt_cor <- c(first(crt[acc],default = numeric(0)), diff(crt[acc])) # rt_cor in mem order
+      }
+
+      # Fill in the output structures
+      # In simulation order, not search order!!!!
+      RT[i,] <- rt
+      recalled[i,] <- acc[reverseOrd]
+      recoverable[i,] <- rec[reverseOrd]
+      rt_cor_tmp <- rep(NA,length(rt))
+      rt_cor_tmp[acc] <- rt_cor
+      RTcor[i,] <- rt_cor_tmp[reverseOrd]
+      serialOrder[i,] <- ord
+    } # close for
+  } # close if switch
+
+  return(list(Acc=recalled,RT=RT, RTcor = RTcor,
+              order=serialOrder,recoverable = recoverable))
+
+}
 ```
 
 ```{r fetchData}
@@ -297,40 +356,40 @@ RT_byOutput_nRecalled <- raw_data %>%
 ```
 
 ```{r set_model}
-free <- list(c(ER=.62,LR=.025,Ta=150,TR=.02,Tmin=1,Tmax=45,lambda=.5,NDTrate=1), #1
-             c(ER=.525,LR=.05,Ta=75,TR=.01,Tmin=1,Tmax=45,lambda=.8,NDTrate=1), #2
-             c(ER=.52,LR=.06,Ta=200,TR=.01,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #3
-             c(ER=.525,LR=.05,Ta=125,TR=.01,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #4
-             c(ER=.53,LR=.06,Ta=150,TR=.03,Tmin=1,Tmax=45,lambda=.8,NDTrate=1), #5
-             c(ER=.52,LR=.09,Ta=125,TR=.02,Tmin=1,Tmax=45,lambda=.65,NDTrate=1), #6
-             c(ER=.524,LR=.09,Ta=150,TR=.025,Tmin=1,Tmax=45,lambda=.9,NDTrate=1), #7
-             c(ER=.54,LR=.06,Ta=350,TR=.01,Tmin=1,Tmax=45,lambda=.8,NDTrate=1), #8
-             c(ER=.5,LR=.06,Ta=80,TR=.015,Tmin=1,Tmax=45,lambda=.9,NDTrate=1), #9 
-             c(ER=.55,LR=.075,Ta=100,TR=.01,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #10
-             c(ER=.52,LR=.075,Ta=150,TR=.02,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #11
-             c(ER=.55,LR=.07,Ta=150,TR=.04,Tmin=1,Tmax=45,lambda=.85,NDTrate=1), #12
-             c(ER=.57,LR=.045,Ta=125,TR=.03,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #13
-             c(ER=.54,LR=.09,Ta=100,TR=.02,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #14
-             c(ER=.52,LR=.09,Ta=200,TR=.01,Tmin=1,Tmax=45,lambda=.85,NDTrate=1), #15
-             c(ER=.55,LR=.09,Ta=175,TR=.035,Tmin=1,Tmax=45,lambda=.65,NDTrate=1), #16
-             c(ER=.52,LR=.12,Ta=100,TR=.035,Tmin=1,Tmax=45,lambda=.7,NDTrate=1), #17
-             c(ER=.56,LR=.09,Ta=200,TR=.03,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #18
-             c(ER=.53,LR=.09,Ta=125,TR=.02,Tmin=1,Tmax=45,lambda=.6,NDTrate=1), #19
-             c(ER=.53,LR=.09,Ta=80,TR=.05,Tmin=1,Tmax=60,lambda=.75,NDTrate=1), #20
-             c(ER=.515,LR=.09,Ta=100,TR=.025,Tmin=1,Tmax=45,lambda=.85,NDTrate=1), #21
-             c(ER=.53,LR=.09,Ta=80,TR=.04,Tmin=1,Tmax=45,lambda=.65,NDTrate=1), #22
-             c(ER=.56,LR=.05,Ta=200,TR=.03,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #23
-             c(ER=.55,LR=.06,Ta=120,TR=.06,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #24
-             c(ER=.57,LR=.015,Ta=250,TR=.03,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #25
-             c(ER=.53,LR=.05,Ta=80,TR=.035,Tmin=1,Tmax=45,lambda=.85,NDTrate=1), #26
-             c(ER=.53,LR=.02,Ta=50,TR=.06,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #27
-             c(ER=.53,LR=.05,Ta=100,TR=.03,Tmin=1,Tmax=45,lambda=.75,NDTrate=1), #28
-             c(ER=.51,LR=.06,Ta=150,TR=.03,Tmin=1,Tmax=45,lambda=.9,NDTrate=1), #29
-             c(ER=.56,LR=.05,Ta=120,TR=.02,Tmin=1,Tmax=45,lambda=.7,NDTrate=1), #30
-             c(ER=.505,LR=.08,Ta=150,TR=.04,Tmin=1,Tmax=45,lambda=.7,NDTrate=1), #31
-             c(ER=.52,LR=.08,Ta=150,TR=.02,Tmin=1,Tmax=60,lambda=.95,NDTrate=1), #32
-             c(ER=.57,LR=.06,Ta=120,TR=.02,Tmin=1,Tmax=45,lambda=.7,NDTrate=1), #33
-             c(ER=.54,LR=.09,Ta=120,TR=.06,Tmin=1,Tmax=45,lambda=.65,NDTrate=1)) #34
+free <- list(c(ER=.60,LR=.01,Ta=125,TR=.01,Tmin=.1,Tmax=45,lambda=.5,stop=45), #1
+             c(ER=.525,LR=.05,Ta=75,TR=.01,Tmin=.1,Tmax=45,lambda=.8,stop=45), #2
+             c(ER=.52,LR=.06,Ta=200,TR=.01,Tmin=.1,Tmax=45,lambda=.75,stop=45), #3
+             c(ER=.525,LR=.05,Ta=125,TR=.01,Tmin=.1,Tmax=45,lambda=.75,stop=45), #4
+             c(ER=.53,LR=.06,Ta=150,TR=.03,Tmin=.1,Tmax=45,lambda=.8,stop=45), #5
+             c(ER=.52,LR=.09,Ta=125,TR=.02,Tmin=.1,Tmax=45,lambda=.65,stop=45), #6
+             c(ER=.524,LR=.09,Ta=150,TR=.025,Tmin=.1,Tmax=45,lambda=.9,stop=45), #7
+             c(ER=.54,LR=.06,Ta=350,TR=.01,Tmin=.1,Tmax=45,lambda=.8,stop=45), #8
+             c(ER=.5,LR=.06,Ta=80,TR=.015,Tmin=.1,Tmax=45,lambda=.9,stop=45), #9 
+             c(ER=.55,LR=.075,Ta=100,TR=.01,Tmin=.1,Tmax=45,lambda=.75,stop=45), #10
+             c(ER=.52,LR=.075,Ta=150,TR=.02,Tmin=.1,Tmax=45,lambda=.75,stop=45), #11
+             c(ER=.55,LR=.07,Ta=150,TR=.04,Tmin=.1,Tmax=45,lambda=.85,stop=45), #12
+             c(ER=.57,LR=.045,Ta=125,TR=.03,Tmin=.1,Tmax=45,lambda=.75,stop=45), #13
+             c(ER=.5,LR=.09,Ta=100,TR=.02,Tmin=.2,Tmax=30,lambda=.9,stop=30), #14
+             c(ER=.52,LR=.09,Ta=200,TR=.01,Tmin=.1,Tmax=45,lambda=.85,stop=45), #15
+             c(ER=.53,LR=.05,Ta=150,TR=.035,Tmin=.2,Tmax=20,lambda=.9,stop=20), #16
+             c(ER=.52,LR=.12,Ta=100,TR=.035,Tmin=.1,Tmax=45,lambda=.7,stop=45), #17
+             c(ER=.56,LR=.09,Ta=200,TR=.03,Tmin=.1,Tmax=45,lambda=.75,stop=45), #18
+             c(ER=.53,LR=.09,Ta=125,TR=.02,Tmin=.1,Tmax=45,lambda=.6,stop=45), #19
+             c(ER=.53,LR=.09,Ta=80,TR=.05,Tmin=.1,Tmax=60,lambda=.75,stop=60), #20
+             c(ER=.515,LR=.09,Ta=100,TR=.025,Tmin=.1,Tmax=45,lambda=.85,stop=45), #21
+             c(ER=.53,LR=.09,Ta=80,TR=.04,Tmin=.1,Tmax=45,lambda=.65,stop=45), #22
+             c(ER=.53,LR=.04,Ta=200,TR=.03,Tmin=.1,Tmax=45,lambda=.75,stop=45), #23
+             c(ER=.55,LR=.06,Ta=120,TR=.06,Tmin=.1,Tmax=45,lambda=.75,stop=45), #24
+             c(ER=.57,LR=.015,Ta=250,TR=.03,Tmin=.1,Tmax=45,lambda=.75,stop=45), #25
+             c(ER=.53,LR=.05,Ta=80,TR=.035,Tmin=.1,Tmax=45,lambda=.85,stop=45), #26
+             c(ER=.535,LR=.02,Ta=100,TR=.09,Tmin=.1,Tmax=20,lambda=.9,stop=20), #27
+             c(ER=.53,LR=.05,Ta=100,TR=.03,Tmin=.1,Tmax=45,lambda=.75,stop=45), #28
+             c(ER=.51,LR=.06,Ta=150,TR=.03,Tmin=.1,Tmax=45,lambda=.9,stop=45), #29
+             c(ER=.55,LR=.04,Ta=120,TR=.02,Tmin=.1,Tmax=45,lambda=.7,stop=45), #30
+             c(ER=.505,LR=.08,Ta=150,TR=.04,Tmin=.1,Tmax=45,lambda=.7,stop=45), #31
+             c(ER=.52,LR=.08,Ta=150,TR=.02,Tmin=.1,Tmax=60,lambda=.95,stop=60), #32
+             c(ER=.57,LR=.06,Ta=120,TR=.02,Tmin=.1,Tmax=45,lambda=.7,stop=45), #33
+             c(ER=.54,LR=.09,Ta=120,TR=.06,Tmin=.1,Tmax=45,lambda=.65,stop=45)) #34
 
 if (!all(unlist(lapply(lapply(free,names), setequal, params$pars)))) {
   stop("Model specs in header don't match free parameters. Edit header or list of free parameters")
@@ -369,9 +428,9 @@ subjects <- unique(raw_data$subject)
     message(paste("Log at", cluster$logfile))
     cat(paste('[',Sys.time(),']',"INIT parlog"),
         file=cluster$logfile, sep='\n')
-    clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine", "CFR_PCR"))
+    clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine", "CFR_PCR", "freeRecall"))
     results <- foreach(j = subjects, .verbose=T,
-                       .packages=c("optimx","PCR","whoppeR", "magrittr",
+                       .packages=c("optimx","whoppeR", "magrittr",
                                    "dplyr","reshape2","tidyr"))  %dopar% {
       sink(cluster$logfile, append=TRUE)
       cat(paste("Fitting subject", j,"\n"))
