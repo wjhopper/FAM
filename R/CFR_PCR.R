@@ -45,22 +45,27 @@ CFR_PCR <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda
                    nrow=p['nSim'],ncol=p['nList']) * p['nFeat']
 
   # practice test
-  prac <- freeRecall(mem,thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
-                     Time = p['Time'], lambda=p['lambda'])
+  prac <- freeRecall(mem, thresh,
+                     Tmin = p['Tmin'], Tmax = p['Tmax'],
+                     Time = p['Time'], lambda=p['lambda'],
+                     stop = p["stop"])
 
   # study practice
   restudyStrengths <- study_beta(mem=mem, nFeatures=p['nFeat'],
                             LR = p['LR'], FR = p['FR'])
-  restudy<-freeRecall(restudyStrengths, thresh, Tmin = p['Tmin'], Tmax = p['Tmax'],
-                      Time = p['Time'], lambda=p['lambda'])
+  restudy<-freeRecall(restudyStrengths, thresh,
+                      Tmin = p['Tmin'], Tmax = p['Tmax'],
+                      Time = p['Time'], lambda=p['lambda'],
+                      stop = p["stop"])
 
   # test practice
   testStrengths <- test_beta(mem=mem,  nFeatures=p['nFeat'],
-                        thresh = thresh, acc = prac$Acc, LR = p['LR'],
-                        TR = p['TR'], FR = p['FR'])
+                             thresh = thresh, acc = prac$Acc, LR = p['LR'],
+                             TR = p['TR'], FR = p['FR'])
   tested <- freeRecall(testStrengths$mem, testStrengths$thresh,
-                     Tmin = p['Tmin'], Tmax = p['Tmax'],
-                     Time = p['Time'], lambda=p['lambda'])
+                       Tmin = p['Tmin'], Tmax = p['Tmax'],
+                       Time = p['Time'], lambda=p['lambda'],
+                       stop = p["stop"])
 
   # Putting the output together
   order <- rbind(prac$order,restudy$order,tested$order)
