@@ -534,7 +534,8 @@ for (i in unique(raw_predictions$subject)) {
     geom_point() +
     geom_line() +
     facet_grid(class ~ type, labeller = labeller(class = class_labels,
-                                                 type = type_labels)) +
+                                                 type = type_labels),
+               scales = "free_y") +
     scale_y_continuous("Median Inter-Retreival Time of Item x") +
     scale_x_discrete("Output Postion (x)") +
     scale_color_discrete("Items Recalled") +
@@ -564,31 +565,31 @@ for (i in unique(raw_predictions$subject)) {
 
 # Averaged Results
 ```{r condition_averages}
-prob_atLeast_x %<>% group_by(class,order,type) %>%
-    summarise(sd = sd(acc),
-              acc = mean(acc),
-              nSubs = n())
-
-RT_byOutput_nRecalled %<>%
+prob_atLeast_x_collapsed <- prob_atLeast_x %>%
+  group_by(class,order,type) %>%
+  summarise(sd = sd(acc),
+            acc = mean(acc),
+            nSubs = n())
+RT_byOutput_nRecalled_collapsed <- RT_byOutput_nRecalled %>%
   group_by(class, order, nRecalled, type) %>%
-    summarise(MAD = mad(RT, constant = 1),
-              RT = median(RT),
-              nSubs = n())
+  summarise(MAD = mad(RT, constant = 1),
+            RT = median(RT),
+            nSubs = n())
 ```
 
 ```{r condition_averages_plots,results='asis'}
-rtPlot %+% RT_byOutput_nRecalled +
+rtPlot %+% RT_byOutput_nRecalled_collapsed +
   geom_point() +
   geom_errorbar(aes(ymin = RT - MAD,
                     ymax = RT + MAD),
                 linetype=1,
                 width=.3)
   
-accPlot %+% prob_atLeast_x +
+accPlot %+% prob_atLeast_x_collapsed +
   geom_errorbar(aes(ymin = acc - sd/sqrt(nSubs),
                     ymax = acc + sd/sqrt(nSubs)),
-                  linetype=1,
-                  width=.3)
+                linetype=1,
+                width=.3)
 
 avg_res <- summarise_each(do.call(rbind,results),funs(mean))
 print(xtable(as.matrix(avg_res[1:which(names(avg_res)=='value')]),
@@ -596,6 +597,35 @@ print(xtable(as.matrix(avg_res[1:which(names(avg_res)=='value')]),
         type = "html", include.rownames=FALSE, caption.placement="top")
 ```
 
+```{r}
+medianRT_by_output_order <- bind_rows(
+  select(raw_predictions, subject, class, order, RT = obsRT) %>% mutate(type = "model"),
+  select(raw_data, subject, class, order, RT) %>% mutate(type = "real")
+  ) %>%
+  filter(!is.na(order)) %>%
+  group_by(class, order, type) %>%
+  summarise(RT = median(RT, na.rm = TRUE),
+            N = n()) %>%
+  ungroup()
+ggplot(medianRT_by_output_order, aes(x=order, y=RT, color=class, linetype=type)) +
+  geom_point() +
+  geom_line() +
+  facet_grid(class ~ ., labeller = labeller(class = class_labels))
+```
+
+```{r}
+binned <- RT_byOutput_nRecalled %>%
+  filter(nRecalled >=3) %>% 
+  group_by(class,type) %>%
+  mutate(bin = cut(nRecalled, breaks = c(3,6, 10, 15),include.lowest = TRUE)) %>%
+  group_by(bin,order,class,type) %>%
+  summarise(RT = median(RT))
+
+ggplot(binned, aes(x=order, y=RT, color=bin, linetype=type)) +
+  geom_point() +
+  geom_line() +
+  facet_grid(class ~.,  labeller = labeller(class = class_labels))
+```
 
 ```{r test, eval=FALSE}
 x <- RT_preds %>% 
