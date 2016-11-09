@@ -12,8 +12,8 @@ params:
   inpar: TRUE
   model: CFR_PCR
   routine: test
-  pars: !r c("ER","LR","Ta","TR","Tmin","Tmax","lambda","stop")
-  fixed: !r c(FR=0,nFeat=100,nSim=1000,nList=15,Time=90,NDTrate=1)
+  pars: !r c("ER","LR","Ta","TR","Tmin","Tmax","lambda","stop","k")
+  fixed: !r c(FR=0,nFeat=100,nSim=1000,nList=15,Time=90)
 ---
 
 ```{r setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
@@ -110,22 +110,20 @@ RT_ErrorFcn <- function(free, fixed, RT_observations, fcn = CFR_PCR, ...) {
     predicted_points <- filter(preds,
                                class == data_point$class,
                                obsOrder == data_point$order,
-                               nRecalled == data_point$nRecalled,
-                               obsRT <=  data_point$RT) %>%
+                               nRecalled == data_point$nRecalled) %>%
       use_series(obsRT)
     
     if (length(predicted_points) != 0) {
-      
-      evaluation_points <- data_point$RT - predicted_points
-      likelihood[i] <- -sum(dexp(x = evaluation_points,
-                                rate = p['NDTrate'],
-                                log = TRUE))
+      likelihood[i] <- sum(dgamma(x = data_point$RT,
+                                  shape = p['k'],
+                                  scale = predicted_points/(p['k']-1),
+                                  log = TRUE))
     } else {
        return(.Machine$double.xmax)
     }
   }
-
-  return(sum(likelihood))
+  
+  return(-sum(likelihood))
 }
 
 minimization_routine <- function(model, erf = RT_ErrorFcn) {
@@ -135,7 +133,7 @@ minimization_routine <- function(model, erf = RT_ErrorFcn) {
                 method="Nelder-Mead",
                 itnmax=1000,
                 control = list(maxit=1000,kkt=FALSE,
-                               parscale = c(1,1,200,1,1,100,1,1)),
+                               parscale = c(1,1,200,1,1,100,1,1,1)),
                 fcn = model$obj, # passed to erf
                 fixed = model$fixed, # passed to erf
                 RT_observations = model$RT_observations[model$RT_observations$subject == j,], # passed to erf
@@ -165,7 +163,7 @@ paramBounds <- function(p) {
 
   probability_params <- c("ER","LR","TR","FR")
   strict_positive_params <- c("Tmin","Tmax","lambda")
-  above_one_params <- c("Ta","Tb")
+  above_one_params <- c("Ta","Tb","k","stop")
 
   prob_check <- any(p[names(p) %in% probability_params] < 0, na.rm = TRUE) ||
                 any(p[names(p) %in% probability_params] >= 1, na.rm = TRUE)
@@ -266,40 +264,40 @@ RT_byOutput_nRecalled <- raw_data %>%
 ```
 
 ```{r set_model}
-free <- list(c(ER=.6,LR=.025,Ta=150,TR=.01,Tmin=.3,Tmax=45,lambda=.5,stop=45), #1
-             c(ER=.525,LR=.05,Ta=75,TR=.01,Tmin=.3,Tmax=45,lambda=.85,stop=45), #2
-             c(ER=.52,LR=.06,Ta=200,TR=.01,Tmin=.3,Tmax=45,lambda=.75,stop=45), #3
-             c(ER=.525,LR=.05,Ta=125,TR=.01,Tmin=.4,Tmax=45,lambda=.75,stop=45), #4
-             c(ER=.53,LR=.06,Ta=150,TR=.03,Tmin=.3,Tmax=45,lambda=.8,stop=45), #5
-             c(ER=.52,LR=.09,Ta=125,TR=.02,Tmin=.4,Tmax=45,lambda=.65,stop=45), #6
-             c(ER=.524,LR=.09,Ta=150,TR=.025,Tmin=.3,Tmax=45,lambda=.9,stop=45), #7
-             c(ER=.54,LR=.06,Ta=350,TR=.01,Tmin=.3,Tmax=45,lambda=.8,stop=45), #8
-             c(ER=.5,LR=.06,Ta=80,TR=.015,Tmin=.3,Tmax=45,lambda=.9,stop=45), #9
-             c(ER=.55,LR=.075,Ta=100,TR=.01,Tmin=.3,Tmax=45,lambda=.75,stop=45), #10
-             c(ER=.52,LR=.075,Ta=150,TR=.02,Tmin=.3,Tmax=45,lambda=.75,stop=45), #11
-             c(ER=.55,LR=.07,Ta=150,TR=.04,Tmin=.3,Tmax=45,lambda=.85,stop=45), #12
-             c(ER=.57,LR=.045,Ta=125,TR=.03,Tmin=.4,Tmax=45,lambda=.75,stop=45), #13
-             c(ER=.54,LR=.09,Ta=125,TR=.03,Tmin=.3,Tmax=45,lambda=.75,stop=45), #14
-             c(ER=.52,LR=.09,Ta=200,TR=.01,Tmin=.4,Tmax=45,lambda=.85,stop=45), #15
-             c(ER=.55,LR=.08,Ta=150,TR=.04,Tmin=.3,Tmax=35,lambda=.85,stop=35), #16
-             c(ER=.52,LR=.12,Ta=100,TR=.035,Tmin=.3,Tmax=45,lambda=.7,stop=45), #17
-             c(ER=.56,LR=.09,Ta=200,TR=.03,Tmin=.3,Tmax=45,lambda=.75,stop=45), #18
-             c(ER=.53,LR=.09,Ta=125,TR=.02,Tmin=.5,Tmax=40,lambda=.8,stop=40), #19
-             c(ER=.53,LR=.09,Ta=80,TR=.05,Tmin=.3,Tmax=60,lambda=.75,stop=60), #20
-             c(ER=.5,LR=.07,Ta=250,TR=.025,Tmin=.2,Tmax=25,lambda=1.5,stop=25), #21
-             c(ER=.53,LR=.09,Ta=80,TR=.04,Tmin=.3,Tmax=45,lambda=.65,stop=45), #22
-             c(ER=.55,LR=.04,Ta=200,TR=.03,Tmin=.3,Tmax=45,lambda=.9,stop=45), #23
-             c(ER=.55,LR=.06,Ta=120,TR=.06,Tmin=.3,Tmax=45,lambda=.75,stop=45), #24
-             c(ER=.57,LR=.015,Ta=250,TR=.03,Tmin=.3,Tmax=45,lambda=.75,stop=45), #25
-             c(ER=.53,LR=.05,Ta=80,TR=.035,Tmin=.3,Tmax=45,lambda=.85,stop=45), #26
-             c(ER=.54,LR=.02,Ta=100,TR=.06,Tmin=.3,Tmax=45,lambda=.9,stop=45), #27
-             c(ER=.53,LR=.05,Ta=100,TR=.03,Tmin=.4,Tmax=45,lambda=.75,stop=45), #28
-             c(ER=.51,LR=.06,Ta=150,TR=.03,Tmin=.3,Tmax=45,lambda=.9,stop=45), #29
-             c(ER=.56,LR=.05,Ta=120,TR=.02,Tmin=.3,Tmax=45,lambda=.7,stop=45), #30
-             c(ER=.505,LR=.08,Ta=150,TR=.04,Tmin=.3,Tmax=45,lambda=.7,stop=45), #31
-             c(ER=.52,LR=.08,Ta=150,TR=.02,Tmin=.4,Tmax=60,lambda=.95,stop=60), #32
-             c(ER=.57,LR=.06,Ta=120,TR=.02,Tmin=.3,Tmax=45,lambda=.7,stop=45), #33
-             c(ER=.54,LR=.09,Ta=120,TR=.06,Tmin=.3,Tmax=45,lambda=.65,stop=45)) #34
+free <- list(c(ER=.6,LR=.025,Ta=150,TR=.01,Tmin=.3,Tmax=45,lambda=.5,stop=45,k=1.5), #1
+             c(ER=.525,LR=.05,Ta=75,TR=.01,Tmin=.3,Tmax=45,lambda=.85,stop=45,k=1.5), #2
+             c(ER=.52,LR=.06,Ta=200,TR=.01,Tmin=.3,Tmax=45,lambda=.75,stop=45,k=1.5), #3
+             c(ER=.525,LR=.05,Ta=125,TR=.01,Tmin=.4,Tmax=45,lambda=.75,stop=45,k=1.5), #4
+             c(ER=.53,LR=.06,Ta=150,TR=.03,Tmin=.3,Tmax=45,lambda=.8,stop=45,k=1.5), #5
+             c(ER=.52,LR=.09,Ta=125,TR=.02,Tmin=.4,Tmax=45,lambda=.65,stop=45,k=1.5), #6
+             c(ER=.524,LR=.09,Ta=150,TR=.025,Tmin=.3,Tmax=45,lambda=.9,stop=45,k=1.5), #7
+             c(ER=.54,LR=.06,Ta=350,TR=.01,Tmin=.3,Tmax=45,lambda=.8,stop=45,k=1.5), #8
+             c(ER=.5,LR=.06,Ta=80,TR=.015,Tmin=.3,Tmax=45,lambda=.9,stop=45,k=1.5), #9
+             c(ER=.55,LR=.075,Ta=100,TR=.01,Tmin=.3,Tmax=45,lambda=.75,stop=45,k=1.5), #10
+             c(ER=.52,LR=.075,Ta=150,TR=.02,Tmin=.3,Tmax=45,lambda=.75,stop=45,k=1.5), #11
+             c(ER=.55,LR=.07,Ta=150,TR=.04,Tmin=.3,Tmax=45,lambda=.85,stop=45,k=1.5), #12
+             c(ER=.57,LR=.045,Ta=125,TR=.03,Tmin=.4,Tmax=45,lambda=.75,stop=45,k=1.5), #13
+             c(ER=.54,LR=.09,Ta=125,TR=.03,Tmin=.3,Tmax=45,lambda=.75,stop=45,k=1.5), #14
+             c(ER=.52,LR=.09,Ta=200,TR=.01,Tmin=.4,Tmax=45,lambda=.85,stop=45,k=1.5), #15
+             c(ER=.55,LR=.08,Ta=150,TR=.04,Tmin=.3,Tmax=35,lambda=.85,stop=35,k=1.5), #16
+             c(ER=.52,LR=.12,Ta=100,TR=.035,Tmin=.3,Tmax=45,lambda=.7,stop=45,k=1.5), #17
+             c(ER=.56,LR=.09,Ta=200,TR=.03,Tmin=.3,Tmax=45,lambda=.75,stop=45,k=1.5), #18
+             c(ER=.53,LR=.09,Ta=125,TR=.02,Tmin=.5,Tmax=40,lambda=.8,stop=40,k=1.5), #19
+             c(ER=.53,LR=.09,Ta=80,TR=.05,Tmin=.3,Tmax=60,lambda=.75,stop=60,k=1.5), #20
+             c(ER=.5,LR=.07,Ta=250,TR=.025,Tmin=.2,Tmax=25,lambda=1.5,stop=25,k=1.5), #21
+             c(ER=.53,LR=.09,Ta=80,TR=.04,Tmin=.3,Tmax=45,lambda=.65,stop=45,k=1.5), #22
+             c(ER=.55,LR=.04,Ta=200,TR=.03,Tmin=.3,Tmax=45,lambda=.9,stop=45,k=1.5), #23
+             c(ER=.55,LR=.06,Ta=120,TR=.06,Tmin=.3,Tmax=45,lambda=.75,stop=45,k=1.5), #24
+             c(ER=.57,LR=.015,Ta=250,TR=.03,Tmin=.3,Tmax=45,lambda=.75,stop=45,k=1.5), #25
+             c(ER=.53,LR=.05,Ta=80,TR=.035,Tmin=.3,Tmax=45,lambda=.85,stop=45,k=1.5), #26
+             c(ER=.54,LR=.02,Ta=100,TR=.06,Tmin=.3,Tmax=45,lambda=.9,stop=45,k=1.5), #27
+             c(ER=.53,LR=.05,Ta=100,TR=.03,Tmin=.4,Tmax=45,lambda=.75,stop=45,k=1.5), #28
+             c(ER=.51,LR=.06,Ta=150,TR=.03,Tmin=.3,Tmax=45,lambda=.9,stop=45,k=1.5), #29
+             c(ER=.56,LR=.05,Ta=120,TR=.02,Tmin=.3,Tmax=45,lambda=.7,stop=45,k=1.5), #30
+             c(ER=.505,LR=.08,Ta=150,TR=.04,Tmin=.3,Tmax=45,lambda=.7,stop=45,k=1.5), #31
+             c(ER=.52,LR=.08,Ta=150,TR=.02,Tmin=.4,Tmax=60,lambda=.95,stop=60,k=1.5), #32
+             c(ER=.57,LR=.06,Ta=120,TR=.02,Tmin=.3,Tmax=45,lambda=.7,stop=45,k=1.5), #33
+             c(ER=.54,LR=.09,Ta=120,TR=.06,Tmin=.3,Tmax=45,lambda=.65,stop=45,k=1.5)) #34
 
 if (!all(unlist(lapply(lapply(free,names), setequal, params$pars)))) {
   stop("Model specs in header don't match free parameters. Edit header or list of free parameters")
