@@ -397,7 +397,7 @@ mname <- strsplit(as.character(params$model),"::")[[1]]
 fname <- paste(mname[length(mname)],
                paste0(params$pars,collapse="_"),
                sep="_")
-fpath <- file.path("data",paste(fname,'rds',sep='.'))
+fpath <- file.path("..","data",paste(fname,'rds',sep='.'))
 
 # Filter RTs to those between 2.5th and 97.5th percentile
 # So we don't fit the most extreme RT points
@@ -450,7 +450,10 @@ subjects <- unique(raw_data$subject)
     }
   }
   
-  saveRDS(results, file = fpath)
+  if (params$routine =="minimize") {
+      saveRDS(results, file = fpath)
+  }
+
 } else {
   
   results <- readRDS(fpath)
