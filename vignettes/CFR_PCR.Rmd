@@ -259,7 +259,8 @@ mname <- strsplit(as.character(params$model),"::")[[1]]
 fname <- paste(mname[length(mname)],
                paste0(params$pars,collapse="_"),
                sep="_")
-fpath <- file.path("data",paste(fname,'rds',sep='.'))
+fpath <- file.path("..","data",paste(fname,'rds',sep='.'))
+
 model <- list(free = free,
               fixed =  params$fixed,
               obj = eval(parse(text=params$model)),
@@ -307,7 +308,10 @@ if (params$routine =="minimize") {
     }
   }
   
-  saveRDS(results, file = fpath)  
+  if (params$routine =="minimize") {
+      saveRDS(results, file = fpath)
+  }
+
 } else {
   
   results <- readRDS(fpath)
