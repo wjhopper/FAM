@@ -426,14 +426,16 @@ subjects <- unique(raw_data$subject)
     message(paste("Log at", cluster$logfile))
     cat(paste('[',Sys.time(),']',"INIT parlog"),
         file=cluster$logfile, sep='\n')
-    clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine", "CFR_PCR", "freeRecall"))
+    clusterExport(cluster$handle,
+                  c("accuracyErrorFcn", "RT_ErrorFcn","routine", "CFR_PCR",
+                    "freeRecall", "paramBounds","study_beta", "test_beta",
+                    "model"))
     results <- foreach(j = subjects, .verbose=T,
                        .packages=c("optimx","whoppeR", "magrittr",
                                    "dplyr","reshape2","tidyr"))  %dopar% {
-      sink(cluster$logfile, append=TRUE)
-      cat(paste("Fitting subject", j,"\n"))
+      cat(paste('[', Sys.time(), ']', "Fitting subject", j),
+          sep='\n')
       results <- try(routine(model))
-      sink()
       results
     }
     
