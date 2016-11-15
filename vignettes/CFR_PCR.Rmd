@@ -83,12 +83,11 @@ test_beta <- function(mem, nFeatures, thresh, acc, LR, TR, FR=NULL) {
 # This way, the functions can be exported to any parallel worker threads
 # without needing to export the entire installed FAM package
 CFR_PCR <- FAM::CFR_PCR
-RTdist <- FAM::RTdist
 
 accuracyErrorFcn <- function(free, fixed, accuracy_observations, fcn = CFR_PCR, ...) {
   
   if (!paramBounds(c(free,fixed)) | anyNA(c(free,fixed))) {
-    return(1000000)
+    return(.Machine$double.xmax)
   }
   preds <- fcn(free=free,fixed=fixed, summarised = TRUE)
   err <- sum((preds$acc-accuracy_observations$acc)^2)
@@ -96,33 +95,35 @@ accuracyErrorFcn <- function(free, fixed, accuracy_observations, fcn = CFR_PCR, 
 }
 
 RT_ErrorFcn <- function(free, fixed, RT_observations, fcn = CFR_PCR, ...) {
-  
+
   if (!paramBounds(c(free,fixed)) | anyNA(c(free,fixed))) {
-    return(1000000)
+    return(.Machine$double.xmax)
   }
+  
   preds <- fcn(free=free, fixed=fixed, summarised = FALSE)
-  dist <- preds %>% group_by(class,obsOrder) %>% RTdist()
-  completes <- dist%>%
-    group_by(class) %>%
-    summarise(complete = identical(unique(order), 1:c(free,fixed)['nList']))
+  likelihood <- vector(mode = "numeric", length = nrow(RT_observations))
   
-  if (!all(completes$complete) ||
-      nrow(completes) != length(unique(RT_observations$class))) {
-    dist <- left_join(expand.grid(class=unique(RT_observations$class),
-                                  order = 1:c(free,fixed)['nList'],
-                                  RT=seq(.1,c(free,fixed)['Time'],.1),
-                                  stringsAsFactors = FALSE),
-                      dist,
-                      by = c("class","order","RT"))
-    dist$y[is.na(dist$y)] <- 0
+  for (i in 1:nrow(RT_observations)) {
+    data_point <- RT_observations[i,]
+    predicted_points <- filter(preds,
+                               class == data_point$class,
+                               obsOrder == data_point$order,
+                               nRecalled == data_point$nRecalled,
+                               obsRT <=  data_point$RT) %>%
+      use_series(obsRT)
+    
+    if (length(predicted_points) != 0) {
+      
+      evaluation_points <- data_point$RT - predicted_points
+      likelihood[i] <- -sum(dexp(x = evaluation_points,
+                                rate = 1,
+                                log = TRUE))
+    } else {
+       return(.Machine$double.xmax)
+    }
   }
-  
-  likelihoods <- inner_join(select(RT_observations,
-                                   class, order, RT = RTrounded),
-                            dist,
-                            by = c("class", "order", "RT"))
-  err <- -sum(log(likelihoods$y))
-  return(err)
+
+  return(sum(likelihood))
 }
 
 minimization_routine <- function(model, erf = RT_ErrorFcn) {
@@ -207,40 +208,40 @@ RT_byOutput_nRecalled <- raw_data %>%
 ```
 
 ```{r set_model}
-free <- list(c(ER=.62,LR=.025,Ta=150,TR=.02,Tmin=1,Tmax=45,lambda=.5), #1
-             c(ER=.525,LR=.05,Ta=75,TR=.01,Tmin=1,Tmax=45,lambda=.8), #2
-             c(ER=.52,LR=.06,Ta=200,TR=.01,Tmin=1,Tmax=45,lambda=.75), #3
-             c(ER=.525,LR=.05,Ta=125,TR=.01,Tmin=1,Tmax=45,lambda=.75), #4
-             c(ER=.53,LR=.06,Ta=150,TR=.03,Tmin=1,Tmax=45,lambda=.8), #5
-             c(ER=.52,LR=.09,Ta=125,TR=.02,Tmin=1,Tmax=45,lambda=.65), #6
-             c(ER=.524,LR=.09,Ta=150,TR=.025,Tmin=1,Tmax=45,lambda=.9), #7
-             c(ER=.54,LR=.06,Ta=350,TR=.01,Tmin=1,Tmax=45,lambda=.8), #8
-             c(ER=.5,LR=.06,Ta=80,TR=.015,Tmin=1,Tmax=45,lambda=.9), #9 
-             c(ER=.55,LR=.075,Ta=100,TR=.01,Tmin=1,Tmax=45,lambda=.75), #10
-             c(ER=.52,LR=.075,Ta=150,TR=.02,Tmin=1,Tmax=45,lambda=.75), #11
-             c(ER=.55,LR=.07,Ta=150,TR=.04,Tmin=1,Tmax=45,lambda=.85), #12
-             c(ER=.57,LR=.045,Ta=125,TR=.03,Tmin=1,Tmax=45,lambda=.75), #13
-             c(ER=.54,LR=.09,Ta=100,TR=.02,Tmin=1,Tmax=45,lambda=.75), #14
-             c(ER=.52,LR=.09,Ta=200,TR=.01,Tmin=1,Tmax=45,lambda=.85), #15
-             c(ER=.55,LR=.09,Ta=175,TR=.035,Tmin=1,Tmax=45,lambda=.65), #16
-             c(ER=.52,LR=.12,Ta=100,TR=.035,Tmin=1,Tmax=45,lambda=.7), #17
-             c(ER=.56,LR=.09,Ta=200,TR=.03,Tmin=1,Tmax=45,lambda=.75), #18
-             c(ER=.53,LR=.09,Ta=125,TR=.02,Tmin=1,Tmax=45,lambda=.6), #19
-             c(ER=.53,LR=.09,Ta=80,TR=.05,Tmin=1,Tmax=60,lambda=.75), #20
-             c(ER=.515,LR=.09,Ta=100,TR=.025,Tmin=1,Tmax=45,lambda=.85), #21
-             c(ER=.53,LR=.09,Ta=80,TR=.04,Tmin=1,Tmax=45,lambda=.65), #22
-             c(ER=.56,LR=.05,Ta=200,TR=.03,Tmin=1,Tmax=45,lambda=.75), #23
-             c(ER=.55,LR=.06,Ta=120,TR=.06,Tmin=1,Tmax=45,lambda=.75), #24
-             c(ER=.57,LR=.015,Ta=250,TR=.03,Tmin=1,Tmax=45,lambda=.75), #25
-             c(ER=.53,LR=.05,Ta=80,TR=.035,Tmin=1,Tmax=45,lambda=.85), #26
-             c(ER=.53,LR=.02,Ta=50,TR=.06,Tmin=1,Tmax=45,lambda=.75), #27
-             c(ER=.53,LR=.05,Ta=100,TR=.03,Tmin=1,Tmax=45,lambda=.75), #28
-             c(ER=.51,LR=.06,Ta=150,TR=.03,Tmin=1,Tmax=45,lambda=.9), #29
-             c(ER=.56,LR=.05,Ta=120,TR=.02,Tmin=1,Tmax=45,lambda=.7), #30
-             c(ER=.505,LR=.08,Ta=150,TR=.04,Tmin=1,Tmax=45,lambda=.7), #31
-             c(ER=.52,LR=.08,Ta=150,TR=.02,Tmin=1,Tmax=60,lambda=.95), #32
-             c(ER=.57,LR=.06,Ta=120,TR=.02,Tmin=1,Tmax=45,lambda=.7), #33
-             c(ER=.54,LR=.09,Ta=120,TR=.06,Tmin=1,Tmax=45,lambda=.65)) #34
+free <- list(c(ER=.6,LR=.025,Ta=150,TR=.01,Tmin=.3,Tmax=45,lambda=.5), #1
+             c(ER=.525,LR=.05,Ta=75,TR=.01,Tmin=.3,Tmax=45,lambda=.85), #2
+             c(ER=.52,LR=.06,Ta=200,TR=.01,Tmin=.3,Tmax=45,lambda=.75), #3
+             c(ER=.525,LR=.05,Ta=125,TR=.01,Tmin=.4,Tmax=45,lambda=.75), #4
+             c(ER=.53,LR=.06,Ta=150,TR=.03,Tmin=.3,Tmax=45,lambda=.8), #5
+             c(ER=.52,LR=.09,Ta=125,TR=.02,Tmin=.4,Tmax=45,lambda=.65), #6
+             c(ER=.524,LR=.09,Ta=150,TR=.025,Tmin=.3,Tmax=45,lambda=.9), #7
+             c(ER=.54,LR=.06,Ta=350,TR=.01,Tmin=.3,Tmax=45,lambda=.8), #8
+             c(ER=.5,LR=.06,Ta=80,TR=.015,Tmin=.3,Tmax=45,lambda=.9), #9
+             c(ER=.55,LR=.075,Ta=100,TR=.01,Tmin=.3,Tmax=45,lambda=.75), #10
+             c(ER=.52,LR=.075,Ta=150,TR=.02,Tmin=.3,Tmax=45,lambda=.75), #11
+             c(ER=.55,LR=.07,Ta=150,TR=.04,Tmin=.3,Tmax=45,lambda=.85), #12
+             c(ER=.57,LR=.045,Ta=125,TR=.03,Tmin=.4,Tmax=45,lambda=.75), #13
+             c(ER=.54,LR=.09,Ta=125,TR=.03,Tmin=.3,Tmax=45,lambda=.75), #14
+             c(ER=.52,LR=.09,Ta=200,TR=.01,Tmin=.4,Tmax=45,lambda=.85), #15
+             c(ER=.55,LR=.08,Ta=150,TR=.04,Tmin=.3,Tmax=35,lambda=.85), #16
+             c(ER=.52,LR=.12,Ta=100,TR=.035,Tmin=.3,Tmax=45,lambda=.7), #17
+             c(ER=.56,LR=.09,Ta=200,TR=.03,Tmin=.3,Tmax=45,lambda=.75), #18
+             c(ER=.53,LR=.09,Ta=125,TR=.02,Tmin=.5,Tmax=40,lambda=.8), #19
+             c(ER=.53,LR=.09,Ta=80,TR=.05,Tmin=.3,Tmax=60,lambda=.75), #20
+             c(ER=.5,LR=.07,Ta=250,TR=.025,Tmin=.2,Tmax=25,lambda=1.5), #21
+             c(ER=.53,LR=.09,Ta=80,TR=.04,Tmin=.3,Tmax=45,lambda=.65), #22
+             c(ER=.55,LR=.04,Ta=200,TR=.03,Tmin=.3,Tmax=45,lambda=.9), #23
+             c(ER=.55,LR=.06,Ta=120,TR=.06,Tmin=.3,Tmax=45,lambda=.75), #24
+             c(ER=.57,LR=.015,Ta=250,TR=.03,Tmin=.3,Tmax=45,lambda=.75), #25
+             c(ER=.53,LR=.05,Ta=80,TR=.035,Tmin=.3,Tmax=45,lambda=.85), #26
+             c(ER=.54,LR=.02,Ta=100,TR=.06,Tmin=.3,Tmax=45,lambda=.9), #27
+             c(ER=.53,LR=.05,Ta=100,TR=.03,Tmin=.4,Tmax=45,lambda=.75), #28
+             c(ER=.51,LR=.06,Ta=150,TR=.03,Tmin=.3,Tmax=45,lambda=.9), #29
+             c(ER=.56,LR=.05,Ta=120,TR=.02,Tmin=.3,Tmax=45,lambda=.7), #30
+             c(ER=.505,LR=.08,Ta=150,TR=.04,Tmin=.3,Tmax=45,lambda=.7), #31
+             c(ER=.52,LR=.08,Ta=150,TR=.02,Tmin=.4,Tmax=60,lambda=.95), #32
+             c(ER=.57,LR=.06,Ta=120,TR=.02,Tmin=.3,Tmax=45,lambda=.7), #33
+             c(ER=.54,LR=.09,Ta=120,TR=.06,Tmin=.3,Tmax=45,lambda=.65)) #34
 
 if (!all(unlist(lapply(lapply(free,names), setequal, params$pars)))) {
   stop("Model specs in header don't match free parameters. Edit header or list of free parameters")
@@ -281,7 +282,7 @@ subjects <- unique(raw_data$subject)
         file=cluster$logfile, sep='\n')
     clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine",
                                     "paramBounds","study_beta", "test_beta",
-                                    "model", "CFR_PCR", "RTdist"))
+                                    "model", "CFR_PCR"))
     clusterCall(cluster$handle, options, warn = 1)
     results <- foreach(j = subjects, .verbose=T,
                        .packages=c("optimx","PCR","whoppeR", "magrittr",
