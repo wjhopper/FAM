@@ -16,7 +16,7 @@
 #' @export
 #'
 CFR_PCR <- function(free = c(ER=.53,LR=.3,Ta =49.5,TR = .1,Tmin=1,Tmax=30,lambda=.8),
-                    fixed = c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90),
+                    fixed = c(FR=0,nFeat=100,nSim=1000,nList=15,Time=90),
                     summarised = TRUE) {
 
   p <- c(free,fixed)
