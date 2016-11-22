@@ -10,7 +10,7 @@ output:
     css: custom.css
 params:
   inpar: TRUE
-  model: FAM::CFR_PCR
+  model: CFR_PCR
   routine: test
   pars: !r c("ER","LR","Ta","TR","Tmin","Tmax","lambda")
   fixed: !r c(FR=0,theta=.5,nFeat=100,nSim=1000,nList=15,Time=90)
@@ -112,6 +112,12 @@ test_beta <- function(mem, nFeatures, thresh, acc, LR, TR, FR=NULL) {
 
   return(list(mem = mem,thresh = thresh))
 }
+
+# Make a local copy of functions from FAM package needed during fitting.
+# This way, the functions can be exported to any parallel worker threads
+# without needing to export the entire installed FAM package
+CFR_PCR <- FAM::CFR_PCR
+RTdist <- FAM::RTdist
 
 accuracyErrorFcn <- function(free, fixed, obs, fcn = CFR_PCR) {
   
@@ -284,10 +290,11 @@ if (params$routine =="minimize") {
         file=cluster$logfile, sep='\n')
     clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine",
                                     "paramBounds","study_beta", "test_beta",
-                                    "model"))
+                                    "model", "CFR_PCR", "RTdist"))
     results <- foreach(j = unique(model$data$subject), .verbose=T,
-                       .packages=c("optimx","PCR","whoppeR",
-                                   "dplyr","FAM","reshape2","tidyr"))  %dopar% {
+                       .packages=c("optimx","PCR","whoppeR", "magrittr",
+                                   "dplyr","reshape2","tidyr"))  %dopar% {
+
       cat(paste('[', Sys.time(), ']', "Fitting subject", j),
           sep='\n')
       results <- try(routine(model))
@@ -297,6 +304,7 @@ if (params$routine =="minimize") {
     stopCluster(cluster$handle)
     cat(paste('[',Sys.time(),']',"Finished Fitting"),
         file=cluster$logfile, sep='\n')
+    
   } else {
     
     results <- vector(mode='list', length =length(unique(model$data$subject)))
