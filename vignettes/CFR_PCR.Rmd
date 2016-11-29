@@ -290,6 +290,7 @@ subjects <- unique(raw_data$subject)
     clusterExport(cluster$handle, c("accuracyErrorFcn", "RT_ErrorFcn","routine",
                                     "paramBounds","study_beta", "test_beta",
                                     "model", "CFR_PCR", "RTdist"))
+    clusterCall(cluster$handle, options, warn = 1)
     results <- foreach(j = subjects, .verbose=T,
                        .packages=c("optimx","PCR","whoppeR", "magrittr",
                                    "dplyr","reshape2","tidyr"))  %dopar% {
