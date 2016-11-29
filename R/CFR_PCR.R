@@ -138,6 +138,7 @@ RTdist <- function(RT, time=90) {
     filter(!is.na(obsOrder)) %>%
     do(d = safe_density(.$obsRT, bw=1,n=time*10,from=.1,to=time,na.rm=TRUE)) %>%
     do(data_frame(class = .$class, obsOrder = .$obsOrder, RT = .$d$x,y=.$d$y)) %>%
+    ungroup() %>%
     group_by_(.dots = as.character(groups(RT))) %>%
     mutate(y = (y/sum(y))*acc$acc[acc$class==class[1] & acc$memOrder==obsOrder[1]]) %>%
     group_by(class) %>%
