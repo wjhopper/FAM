@@ -302,7 +302,7 @@ subjects <- unique(raw_data$subject)
     
     stopCluster(cluster$handle)
     cat(paste('[',Sys.time(),']',"Finished Fitting"),
-        file=cluster$logfile, sep='\n')
+        file=cluster$logfile, sep='\n', append = TRUE)
     
   } else {
 
