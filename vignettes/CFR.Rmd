@@ -214,6 +214,35 @@ backward <- forward %+% condition_IRTs + aes(x=revOrder) +
 print(backward)
 ```
 
+
+## Quantile Plots
+```{r quantiles}
+quantile_points <- c(0.1, 0.3, 0.5, 0.7, 0.9)
+
+correct_quantiles <- corrects %>%
+  group_by(class,output_order) %>%
+  do(as.data.frame(t(quantile(.$RT, probs =quantile_points)))) %>%
+  ungroup() %>%
+  gather_(key_col="quantile",
+          value_col="RT",
+          gather_cols=paste0(quantile_points*100, "%")
+          )
+
+ggplot(correct_quantiles,
+       aes(x =output_order,
+           y = RT,
+           color = quantile)) +
+  geom_point() +
+  geom_line() + 
+  facet_grid(.~class) +
+  scale_x_continuous("Output Order",
+                    breaks = 1:15
+                    ) +
+  scale_color_discrete(name="Quantile") + 
+  theme(panel.grid.minor.x = element_blank())
+  
+```
+
 ## Grand Averages 
 ```{r averages, results="markdown"}
 summary_fun <- function(data) {
