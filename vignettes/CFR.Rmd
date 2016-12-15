@@ -29,6 +29,10 @@ knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE,
 op <- options(contrasts = c("contr.sum", "contr.poly")) 
 ```
 
+```{r labelers, include=FALSE}
+class_labels <- c(np="Practice Test", sp="Study Practice", tp="Test Practice")
+```
+
 ```{r testonlyData}
 minimal_variables <- c("subject","cond_list", "class", "target","resp","order",
                        "score", "RT")
@@ -65,7 +69,7 @@ for (i in unique(tested$subject)){
   subAcc <- ggplot(data = filter(accData_bySubjects, subject ==i),
                    aes(x= cond_list, y=count, fill=output_type)) +
     geom_bar(stat="identity") +
-    facet_grid(class~.) +
+    facet_grid(class~., labeller = labeller(class=class_labels)) +
     scale_y_continuous(limits=c(0,ymax)) + 
     scale_fill_manual("Response Type",
                       breaks= c("score","repeats","intrusions"),
@@ -82,7 +86,7 @@ for (i in unique(tested$subject)){
     geom_violin() +
     geom_point(aes(color = output_type)) +
     stat_summary(fun.y = "median") + 
-    facet_grid(class~.) +
+    facet_grid(class~., labeller = labeller(class=class_labels)) +
     scale_color_manual("Response Type",
                       breaks= c("score","repeats","intrusions"),
                       labels =c(score = "Correct",
@@ -197,9 +201,7 @@ forward <- ggplot(filter(condition_IRTs, output_order > 1),
   geom_point(aes(size=count)) +
   geom_line(size = .75) +
   facet_grid(class~.,
-             labeller = labeller(class = c(np = "No Practice",
-                                           sp = "Study Practce",
-                                           tp = "Test Practice"))
+             labeller = labeller(class=class_labels)
              ) +
   scale_x_continuous(breaks = 1:15) +
   scale_color_discrete("Items Recalled") +
@@ -234,7 +236,7 @@ ggplot(correct_quantiles,
            color = quantile)) +
   geom_point() +
   geom_line() + 
-  facet_grid(.~class) +
+  facet_grid(.~class, labeller = labeller(class=class_labels)) +
   scale_x_continuous("Output Order",
                     breaks = 1:15
                     ) +
