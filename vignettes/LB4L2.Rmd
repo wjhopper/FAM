@@ -24,9 +24,10 @@ img {
 ```{r setup, include=FALSE}
 devtools::load_all()
 library(dplyr)
+library(tidyr)
 library(whoppeR)
 library(ggplot2)
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.align='center', fig.width = 9)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.align='center', fig.width = 8)
 ```
 
 ```{r tests, include=FALSE, eval=FALSE}
@@ -66,4 +67,49 @@ autoplot(CD_1, DV = "RT")
 joint_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
 autoplot(joint_1, DV = "accuracy")
 autoplot(joint_1, DV = "RT")
+```
+
+
+## Quantile Plots
+```{r quantile, fig.height=8}
+IV_sub <- summary(LB4L2_final, level = "subject")
+
+quantile_points <- c(.1,.3,.5,.7,.9)
+quantiles_correct <- IV_sub %>%
+  filter(final_acc == 1,
+         !is.na(RT)) %>%
+  group_by(group, practice, OCpractice) %>%
+  do(as.data.frame(t(quantile(.$RT, probs = quantile_points)))) %>%
+  ungroup() %>%
+  gather(quantile, RT,  -group, -practice, -OCpractice) %>%
+  mutate(cue = ifelse(OCpractice == "N", "Same Cue", "Other Cue"),
+         old_practice = practice,
+         practice = case_when(.$practice == "S" | .$OCpractice == "S" ~ "S",
+                          .$practice == "T" | .$OCpractice == "T" ~ "T",
+                          TRUE ~ "N"))
+
+practice_labels <- c(N = "No Practice",
+                     S = "Study",
+                     T = "Test")
+
+capitalize <- function(string) {
+  substr(string, 1, 1) <- toupper(substr(string, 1, 1))
+  string
+}
+
+ggplot(quantiles_correct,
+       aes(x=quantile,
+           y=RT,
+           color = cue)
+       ) +
+  geom_point(size=1.5) +
+  geom_line(aes(group=cue), size=.75) +
+  facet_grid(practice ~ group,
+             labeller = labeller(practice = practice_labels,
+                                 .default = capitalize)
+             ) + 
+  scale_color_discrete(name="Practice\nTest Cue") +
+  theme_grey(base_size = 16)
+  
+
 ```
