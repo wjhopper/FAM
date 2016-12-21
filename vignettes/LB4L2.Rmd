@@ -71,7 +71,7 @@ autoplot(joint_1, DV = "RT")
 
 
 ## Quantile Plots
-```{r quantiles, fig.height=8}
+```{r quantiles, fig.height=8,fig.width = 11}
 IV_sub <- summary(LB4L2_final, level = "subject")
 
 quantile_points <- seq(.01,1,length.out = 100)
@@ -88,17 +88,13 @@ quantiles_correct <- IV_sub %>%
   ungroup() %>%
   left_join(y = filter(IV, final_acc==1) %>%
               select(group,practice,OCpractice,mean_p)) %>%
-  mutate(probability = probability * mean_p,
-         cue = ifelse(OCpractice == "N", "Same Cue", "Other Cue"),
-         old_practice = practice,
-         practice = case_when(.$practice == "S" | .$OCpractice == "S" ~ "S",
-                          .$practice == "T" | .$OCpractice == "T" ~ "T",
-                          TRUE ~ "N")) %>%
-  select(-old_practice, -mean_p)
+  mutate(probability = probability * mean_p)
 
-practice_labels <- c(N = "No Practice",
-                     S = "Study",
-                     T = "Test")
+practice_labels <- c(N.N = "Baseline",
+                     N.S = "Study, Other Cue",
+                     S.N = "Study, Same Cue",
+                     N.T = "Test, Other Cue",
+                     T.N = "Test, Same Cue")
 
 capitalize <- function(string) {
   substr(string, 1, 1) <- toupper(substr(string, 1, 1))
@@ -108,22 +104,24 @@ capitalize <- function(string) {
 quantile_plot <- ggplot(quantiles_correct,
                         aes(x=RT,
                             y=probability,
-                            color = cue)
+                            color = interaction(practice, OCpractice)
+                            )
                         ) +
-  geom_line(aes(group=cue), size=.75) +
-  facet_grid(practice ~ group,
-             labeller = labeller(practice = practice_labels,
-                                 .default = capitalize)
+  geom_line(size=.75) +
+  facet_grid(.~ group,
+             labeller = labeller(.default = capitalize)
              ) + 
-  scale_color_discrete(name="Practice\nTest Cue") +
-  scale_x_continuous(breaks = 1:6,
+  scale_color_discrete(name="Condition",
+                       breaks = c("N.N","N.S","N.T","S.N","T.N"),
+                       labels = practice_labels) +
+  scale_x_continuous(breaks = 0:6,
                      limits=c(0,6)) + 
   theme_grey(base_size = 16)
 print(quantile_plot)
 ```
 
 ### Pooled Quantiles
-```{r pooled_quantiles, fig.height=8}
+```{r pooled_quantiles, fig.height=8,fig.width = 11}
 IV_acc_pooled <- LB4L2_final %>%
   group_by(group,practice,OCpractice) %>%
   summarise(acc=mean(acc))
@@ -139,13 +137,7 @@ pooled_quantiles_correct <- LB4L2_final %>%
      ) %>%
   ungroup() %>%
   left_join(y = IV_acc_pooled) %>%
-  mutate(probability = probability * acc,
-         cue = ifelse(OCpractice == "N", "Same Cue", "Other Cue"),
-         old_practice = practice,
-         practice = case_when(.$practice == "S" | .$OCpractice == "S" ~ "S",
-                          .$practice == "T" | .$OCpractice == "T" ~ "T",
-                          TRUE ~ "N")) %>%
-  select(-old_practice, -acc)
+  mutate(probability = probability * acc)
 
 quantile_plot %+% pooled_quantiles_correct
 ```
