@@ -71,24 +71,36 @@ autoplot(joint_1, DV = "RT")
 
 
 ## Quantile Plots
-```{r quantiles, fig.height=8,fig.width = 11}
+```{r quantiles, fig.height=8,fig.width = 11, include=FALSE}
+
+calculate_quantiles <- function(data,
+                                quantiles = c(.1, .3, .5, .7, .9)) {
+  
+  data <- group_by(data, group, practice, OCpractice)
+  data <- do(data,
+             data.frame(probability = quantile_points,
+                        RT = quantile(.$RT,
+                                      probs=quantile_points,
+                                      names=FALSE)
+                        )
+             )
+   data <- ungroup(data)
+   data
+}
+
 IV_sub <- summary(LB4L2_final, level = "subject")
 
 quantile_points <- seq(.01,1,length.out = 100)
+
 quantiles_correct <- IV_sub %>%
   filter(final_acc == 1,
          !is.na(RT)) %>%
-  group_by(group, practice, OCpractice) %>%
-  do(data.frame(probability = quantile_points,
-                RT = quantile(.$RT,
-                              probs=quantile_points,
-                              names=FALSE)
-                )
-     ) %>%
-  ungroup() %>%
-  left_join(y = filter(IV, final_acc==1) %>%
-              select(group,practice,OCpractice,mean_p)) %>%
-  mutate(probability = probability * mean_p)
+  calculate_quantiles(quantile_points) %>%
+  left_join(y = IV[IV$final_acc==1,
+                   c("group","practice","OCpractice","mean_p")],
+            by = c("group","practice","OCpractice")) %>%
+  mutate(probability = probability * mean_p) %>%
+  select(-mean_p)
 
 practice_labels <- c(N.N = "Baseline",
                      N.S = "Study, Other Cue",
@@ -121,6 +133,8 @@ print(quantile_plot)
 ```
 
 ### Pooled Quantiles
+Quantiles are calculated using all observed RT's within a condition, pooled over subjects. They conditioned based on the observed accuracy in that condition. Thus, the quantile curves terminate at the observed accuracy for a particular condition, rather than 1.
+
 ```{r pooled_quantiles, fig.height=8,fig.width = 11}
 IV_acc_pooled <- LB4L2_final %>%
   group_by(group,practice,OCpractice) %>%
@@ -128,16 +142,11 @@ IV_acc_pooled <- LB4L2_final %>%
   
 pooled_quantiles_correct <- LB4L2_final %>%
   filter(acc == 1) %>%
-  group_by(group, practice, OCpractice) %>%
-  do(data.frame(probability = quantile_points,
-                RT = quantile(.$RT,
-                              probs=quantile_points,
-                              names=FALSE)
-                )
-     ) %>%
-  ungroup() %>%
-  left_join(y = IV_acc_pooled) %>%
-  mutate(probability = probability * acc)
+  calculate_quantiles(quantile_points) %>%
+  left_join(y = IV_acc_pooled,
+            by = c("group","practice","OCpractice")) %>%
+  mutate(probability = probability * acc) %>%
+  select(-acc)
 
 quantile_plot %+% pooled_quantiles_correct
 ```
