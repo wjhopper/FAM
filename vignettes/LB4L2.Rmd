@@ -86,11 +86,15 @@ quantiles_correct <- IV_sub %>%
                 )
      ) %>%
   ungroup() %>%
-  mutate(cue = ifelse(OCpractice == "N", "Same Cue", "Other Cue"),
+  left_join(y = filter(IV, final_acc==1) %>%
+              select(group,practice,OCpractice,mean_p)) %>%
+  mutate(probability = probability * mean_p,
+         cue = ifelse(OCpractice == "N", "Same Cue", "Other Cue"),
          old_practice = practice,
          practice = case_when(.$practice == "S" | .$OCpractice == "S" ~ "S",
                           .$practice == "T" | .$OCpractice == "T" ~ "T",
-                          TRUE ~ "N"))
+                          TRUE ~ "N")) %>%
+  select(-old_practice, -mean_p)
 
 practice_labels <- c(N = "No Practice",
                      S = "Study",
