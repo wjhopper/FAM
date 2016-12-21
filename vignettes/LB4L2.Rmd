@@ -71,7 +71,7 @@ autoplot(joint_1, DV = "RT")
 
 
 ## Quantile Plots
-```{r quantile, fig.height=8}
+```{r quantiles, fig.height=8}
 IV_sub <- summary(LB4L2_final, level = "subject")
 
 quantile_points <- seq(.01,1,length.out = 100)
@@ -105,11 +105,11 @@ capitalize <- function(string) {
   string
 }
 
-ggplot(quantiles_correct,
-       aes(x=RT,
-           y=probability,
-           color = cue)
-       ) +
+quantile_plot <- ggplot(quantiles_correct,
+                        aes(x=RT,
+                            y=probability,
+                            color = cue)
+                        ) +
   geom_line(aes(group=cue), size=.75) +
   facet_grid(practice ~ group,
              labeller = labeller(practice = practice_labels,
@@ -119,6 +119,33 @@ ggplot(quantiles_correct,
   scale_x_continuous(breaks = 1:6,
                      limits=c(0,6)) + 
   theme_grey(base_size = 16)
-  
+print(quantile_plot)
+```
 
+### Pooled Quantiles
+```{r pooled_quantiles, fig.height=8}
+IV_acc_pooled <- LB4L2_final %>%
+  group_by(group,practice,OCpractice) %>%
+  summarise(acc=mean(acc))
+  
+pooled_quantiles_correct <- LB4L2_final %>%
+  filter(acc == 1) %>%
+  group_by(group, practice, OCpractice) %>%
+  do(data.frame(probability = quantile_points,
+                RT = quantile(.$RT,
+                              probs=quantile_points,
+                              names=FALSE)
+                )
+     ) %>%
+  ungroup() %>%
+  left_join(y = IV_acc_pooled) %>%
+  mutate(probability = probability * acc,
+         cue = ifelse(OCpractice == "N", "Same Cue", "Other Cue"),
+         old_practice = practice,
+         practice = case_when(.$practice == "S" | .$OCpractice == "S" ~ "S",
+                          .$practice == "T" | .$OCpractice == "T" ~ "T",
+                          TRUE ~ "N")) %>%
+  select(-old_practice, -acc)
+
+quantile_plot %+% pooled_quantiles_correct
 ```
