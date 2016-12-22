@@ -176,13 +176,11 @@ reshaping <- function(long_data) {
 #' @export
 autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
 
-  data$cond <- interaction(data$practice, data$OCpractice)
-
   if (grepl("rt", DV, ignore.case = TRUE)) {
     DV <- "RT"
     y_label <- ylab("Mean of Median First-Press Latency")
   } else if (grepl("acc", DV, ignore.case = TRUE)) {
-    data <- filter(data, final_acc == 1)
+    data <- select(filter(data, final_acc == 1), -final_acc)
     DV <- "probability"
     y_label <- ylab("Mean Accuracy")
   }
@@ -190,8 +188,10 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
   y_val <- grep(paste0('^', DV, '(?!_sd)'), names(data),
                 value = TRUE, perl = TRUE, ignore.case = TRUE)
 
-  p <- ggplot(data = data, aes_string(x = "group", y = y_val,
-                                      color = "cond", group = "cond")) +
+  p <- ggplot(data = data,
+              aes_string(x = "group", y = y_val,
+                         color = "interaction(practice, OCpractice)",
+                         group =" interaction(practice, OCpractice)")) +
     geom_point(size=2) +
     geom_line(size=1) +
     scale_color_discrete("Practice\nCondition",
@@ -216,7 +216,7 @@ autoplot.LB4L_IV_summary <- function(data, DV = "accuracy") {
                            data = data, width = .025)
   }
 
-  if (length(unique(data$final_acc) > 2)) {
+  if (DV == "RT" && "final_acc" %in% names(data)) {
     lookup_table <- c(`0` = "Incorrect", `1` = "Correct")
     p <- p + facet_grid(~final_acc,
                         labeller = labeller(final_acc = lookup_table))
