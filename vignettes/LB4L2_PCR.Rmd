@@ -11,10 +11,10 @@ css: custom.css
 params:
   inpar: FALSE
   routine: testing
+  random_effects: FALSE
+  subset: FALSE  
   mode: group
   likelihood: accuracy
-  random_effects: FALSE
-  subset: FALSE
 ---
 
 ```{r setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
@@ -41,34 +41,31 @@ final <- LB4L2_final %>%
 practice <- LB4L2_tp %>%
   mutate(acc = ifelse((RT < .2 & !is.na(RT)) | (RT > 8  & !is.na(RT)), 0, acc))
 
-sub_RT <- summary(as_LB4L(final), level = "subject") %>%
-  filter(practice != "T", OCpractice != "T", final_acc ==1, probability !=0) %>%
+IV_summary <- summary(final, level = params$mode)
+
+sub_RT <- summary(final, level = "subject") %>%
+  filter(p !=0) %>% #practice != "T", OCpractice != "T", final_acc ==1, 
   select(group, practice, OCpractice, final_acc, RT) %>%
   group_by(group, practice, OCpractice, final_acc) %>%
   summarise(rawRTs = list(round(RT,1)))
 
-IV_obs <- summary(as_LB4L(final), level = params$mode) %>%
-  select(group:OCpractice, final_acc, acc = probability_mean, RT = RT_mean) %>%
+IV_obs <- select(IV_summary, group:mean_RT) %>%
   inner_join(sub_RT)
-rm(sub_RT)
 
-joint_obs_sub <- summary(as_LB4L(final, practice_tests = 2), level = "subject",
-                         given_practice = 1,  given_data = practice) %>%
-  filter(probability != 0) %>%
+joint_summary <- summary(final, level = "group", given_practice = 1, given_data = practice) 
+
+joint_obs_sub <- summary(final, given_practice = 1, given_data = practice) %>%
+  filter(p != 0) %>%
   select(group:final_acc, contains("RT")) %>%
-  group_by(group, sameCue, practice1acc,final_acc) %>%
+  group_by(group, sameCue, practice1acc, final_acc) %>%
   summarise(rawRTs = list(matrix(c(practice1RT, RT), ncol = 2)))
 
-joint_obs <- summary(as_LB4L(final, practice_tests = 2), level = "group",
-                     given_practice = 1,  given_data = practice) %>%
-  select(group:final_acc, acc = probability_mean, RT = RT_mean) %>%
+joint_obs <- select(joint_summary, group:mean_RT) %>%
   inner_join(joint_obs_sub, by = c("group", "sameCue", "practice1acc", "final_acc")) %>%
-  rename(practice = practice1acc, final = final_acc) %>%
   rowwise() %>%
-  mutate(rawRTs = if(final == 1 & practice == 1) {list(rawRTs)} else {list(NULL)},
-         RT = NULL)
-rm(joint_obs_sub)
+  mutate(rawRTs = if(final_acc == 1 & practice1acc == 1) {list(rawRTs)} else {list(NULL)})
 
+rm(joint_obs_sub, sub_RT)
 
 if (params$mode == "group") {
   joint_obs$subject = 1
@@ -81,7 +78,7 @@ if (params$mode == "group") {
 ```{r model_parameters}
 acc_params <- c("ER","LR","FR","FR2","TR","TC")
 RT_params <- c("Tmin","lambda")
-theta <- list(ER=.56, LR=.2, FR=.15, FR2=.3, TR=.02, TC = .02,
+theta <- list(ER=.539, LR=.15, FR=.046, FR2=.1775, TR=.015, TC = .05,
                    Tmax = 8, Tmin = 0.2, lambda = .25)
 parameter_sets <- switch(params$likelihood,
                          accuracy = list(acc_params),
@@ -179,14 +176,14 @@ if (params$mode == "subject") {
   }
   
   model <- replicate(n = length(unique(IV_obs$subject)),
-                     expr = initPCR(params = theta, distribution = "binomial",
+                     expr = initPCR(params = theta, distribution = "beta",
                                     nItems = 20, nSims = 1000, nFeatures = 100,
                                     time = 10),
                      simplify = FALSE)
 
 } else if (params$mode == "group") {
   groups <- 2
-  model <- initPCR(params = theta, distribution = "binomial", nItems = 20,
+  model <- initPCR(params = theta, distribution = "beta", nItems = 20,
                    nSims = 1000, nFeatures = 100, time = 10)
   theta <- list("group_params" = theta)
   model <- list("group_model" = model)
@@ -273,6 +270,7 @@ if (length(raw_preds) > 1) {
 } else {
   best_preds <- summary(raw_preds)
 }
+error <- LB4L2_PCR_erf(best_preds, IV_obs, joint_obs, likelihood = "all")
 ```
 
 ## Parameters
@@ -283,22 +281,38 @@ print(xtable(cbind(best_params, Deviance = 2*fit[1,"value"]), digits=3),
 
 ## Plots
 ```{r plots}
-IV_pred <- best_preds$final %>%
-    select(group, practice, OCpractice, accuracy,
-           acc = proportion, RT = medianRT, rawRTs = rawRTs) %>%
-    rowwise() %>%
-    mutate(rawRTs = list(round(rawRTs,1)),
-           group = if(group == "group1") {"immediate"} else {"delay"})
-IV <- summary(as_LB4L(final), level = params$mode) 
+shape_scale <- scale_shape_manual("Type", breaks = c("obs", "pred"),
+                                  labels = c("Observed", "PCR"), values = c(16,2))
+IVplot_data <- select(error$IV[[1]], -subject, -rawRTs) %>%
+  left_join(mutate(select(IV_summary, -mean_p, -mean_RT), type = "obs"),
+            by = c("group", "practice", "OCpractice", "final_acc", "type"))
+autoplot(as_LB4L_summary(filter(IVplot_data, type == "obs")), 
+                         DV = "accuracy") %+%
+  aes(shape = type) +
+  geom_point(aes(group = NULL),
+             data = filter(IVplot_data, final_acc ==1, type == "pred"),
+             size = 2) +
+  shape_scale + 
+  ggtitle("PCR vs. Obs.")
 
-acc <- autoplot(IV, DV = "accuracy") + 
-  geom_point(aes(y = acc), data = filter(IV_pred, accuracy ==1),
-             position = position_jitter(.05), shape = 18, size = 3) + 
+autoplot(as_LB4L_summary(filter(IVplot_data, final_acc ==1, type == "obs")),
+         DV = "RT") %+%
+  aes(shape = type) +
+  geom_point(aes(group = NULL),
+             data = filter(IVplot_data, final_acc ==1, type == "pred"),
+             size = 2) +
+  shape_scale + 
   ggtitle("PCR vs. Obs.")
-print(acc)
-RT <- autoplot(IV, DV = "RT") +  
-  geom_point(aes(y = RT), data = rename(IV_pred, final_acc = accuracy),
-             position = position_jitter(.05), shape = 18, size = 3) + 
+
+jointplot_data <- select(error$Joint[[1]], -subject, -rawRTs)  %>%
+  left_join(mutate(select(joint_summary, -joint_p, -mean_RT), type = "obs"),
+            by = c("group", "sameCue", "practice1acc", "final_acc", "type"))
+autoplot(as_LB4L_CD_summary(filter(jointplot_data, type == "obs")),
+         DV = "accuracy") %+%
+  aes(shape = type) +
+  geom_point(aes(group = NULL),
+             data = filter(jointplot_data, type == "pred"),
+             size = 2) +
+  shape_scale + 
   ggtitle("PCR vs. Obs.")
-print(RT)
 ```
