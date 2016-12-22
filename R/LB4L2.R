@@ -242,17 +242,22 @@ LB4L_plotbuilder <- function(data, DV) {
                          final_acc = setNames(paste("Final Test", lookup_table), names(lookup_table)))
 
   color_vars <- intersect(c("practice","OCpractice","sameCue"), vars)
+
   if (length(color_vars) > 1) {
     color_vars <- paste0("interaction(", paste0(color_vars, collapse = ","), ")",
-                        collapse = "")
+                         collapse = "")
   }
 
   facet_vars <- paste(grep("^practice[0-9]acc$", names(data), value = TRUE),
                       intersect("final_acc", names(data)),
                       collapse = "+", sep = "~")
+  if (!"type" %in% vars) {
+    data$type <- NA
+  }
 
-  p <- ggplot(data, aes_string(x = "group", y = DV, color = color_vars, group = color_vars)) +
-    geom_point(size=2) +
+  p <- ggplot(data, aes_string(x = "group", y = DV, color = color_vars,
+                               group = color_vars, shape = NULL)) +
+    geom_point(size = 2) +
     geom_line(size=.75) +
     scale_x_discrete("Group",expand=c(0,.35),
                      limits = c("immediate", "delay"),
