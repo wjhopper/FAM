@@ -44,7 +44,8 @@ corrects <- filter(tested, score==1) %>%
   select_(.dots = minimal_variables[!(minimal_variables == "order")]) %>%
   group_by(subject,class,cond_list) %>%
   mutate(output_order = 1:n(),
-         revOrder = rev(output_order)) %>%
+         revOrder = rev(output_order),
+         logRT = log(RT)) %>%
   ungroup() 
 ```
 
