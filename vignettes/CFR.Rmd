@@ -43,7 +43,8 @@ tested <- filter(ungroup(CFR_allSs),
 corrects <- filter(tested, score==1) %>%
   select_(.dots = minimal_variables[!(minimal_variables == "order")]) %>%
   group_by(subject,class,cond_list) %>%
-  mutate(output_order = 1:n()) %>%
+  mutate(output_order = 1:n(),
+         revOrder = rev(output_order)) %>%
   ungroup() 
 ```
 
@@ -150,10 +151,6 @@ Output order is computed only for correct responses, but any RT's are measured r
 to the item output immediately prior, even if that item is an intrusion or repeat.
 
 ```{r revOrder,fig.cap="Error bars represent 2.5 and 97.5 percentiles."}
-corrects %<>% group_by(subject, class, cond_list) %>%
-  mutate(revOrder = rev(output_order)) %>%
-  ungroup()
-  
 RTsummary <- corrects %>%
   group_by(revOrder) %>%
   summarise(meanRT = mean(RT),
