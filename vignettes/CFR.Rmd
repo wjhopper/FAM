@@ -46,7 +46,8 @@ corrects <- filter(tested, score==1) %>%
   mutate(output_order = 1:n(),
          revOrder = rev(output_order),
          logRT = log(RT)) %>%
-  ungroup() 
+  ungroup() %>%
+  complete(subject, class, cond_list, output_order, fill=list(score=0))
 ```
 
 ## Subject Performance 
@@ -153,6 +154,7 @@ to the item output immediately prior, even if that item is an intrusion or repea
 
 ```{r revOrder,fig.cap="Error bars represent 2.5 and 97.5 percentiles."}
 RTsummary <- corrects %>%
+  filter(!is.na(RT)) %>%
   group_by(revOrder) %>%
   summarise(meanRT = mean(RT),
             count = n(),
@@ -220,6 +222,7 @@ print(backward)
 quantile_points <- c(0.1, 0.3, 0.5, 0.7, 0.9)
 
 correct_quantiles <- corrects %>%
+  filter(!is.na(RT)) %>%
   group_by(class,output_order) %>%
   do(as.data.frame(t(quantile(.$RT, probs =quantile_points)))) %>%
   ungroup() %>%
