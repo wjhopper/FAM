@@ -21,7 +21,8 @@ Suggests:
     gridExtra,
     pander,
     wesandersen,
-    testthat
+    testthat,
+    svglite
 License: CC0
 LazyData: true
 VignetteBuilder: knitr

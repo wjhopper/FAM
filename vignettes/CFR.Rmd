@@ -16,17 +16,19 @@ vignette: >
 ```{r knitr_setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
 library(FAM)
 library(whoppeR)
-library(ggplot2)
-library(dplyr) # dplyr version >= .5.0
+library(dplyr)
 library(tidyr)
 library(magrittr)
+library(ggplot2)
+library(grid)
 library(gridExtra)
 library(wesanderson)
 library(effsize)
 library(pander)
-knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE, 
-               warning=F, message=FALSE, fig.align='center')
-op <- options(contrasts = c("contr.sum", "contr.poly")) 
+library(rococo)
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, cache=FALSE, 
+                      fig.width=10, fig.height=6, fig.align='center')
+op <- options(contrasts = c("contr.sum", "contr.poly"))
 ```
 
 ```{r labelers, include=FALSE}
@@ -34,14 +36,17 @@ class_labels <- c(np="Practice Test", sp="Study Practice", tp="Test Practice")
 ```
 
 ```{r testonlyData}
-minimal_variables <- c("subject","cond_list", "class", "target","resp","order",
+minimal_variables <- c("subject","cond_list","class","resp","order",
                        "score", "RT")
+
 tested <- filter(ungroup(CFR_allSs),
                  list != 0,
                  (score %in% 1 | intrusions %in% 1 | repeats %in% 1),
                  phase=='final' | (phase=='prac' & practice =='T'))
+tested$score <- as.integer(tested$score)
 corrects <- filter(tested, score==1) %>%
-  select_(.dots = minimal_variables[!(minimal_variables == "order")]) %>%
+  select_(.dots = c(minimal_variables[!(minimal_variables == "order")],
+                    "target","resp","where")) %>%
   group_by(subject,class,cond_list) %>%
   mutate(output_order = 1:n(),
          revOrder = rev(output_order),
@@ -50,13 +55,130 @@ corrects <- filter(tested, score==1) %>%
   complete(subject, class, cond_list, output_order, fill=list(score=0))
 ```
 
+```{r N_correct_per_list}
+N_correct <- corrects %>%
+  group_by(subject, class, cond_list) %>%
+  summarise(nRecalled = sum(score))
+
+corrects <- left_join(corrects, N_correct,
+                      by = c("subject", "class", "cond_list"))
+```
+
+```{r summary_function}
+summaryFun <- function(data) {
+  
+  grouping_vars <- vapply(groups(data),
+                          as.character,
+                          character(1))
+  
+  x <- summarise(data,
+                 RT_median = median(RT, na.rm = TRUE),
+                 RT_mean = mean(RT, na.rm = TRUE),
+                 logRT_mean = mean(logRT, na.rm = TRUE),
+                 RT_sd = sd(RT, na.rm = TRUE),
+                 MAD = mad(RT, na.rm = T, constant = 1),
+                 RT_n = sum(!is.na(RT))
+                )
+
+  if (!"nRecalled" %in% grouping_vars) {
+    y <- summarise(data,
+                   acc_mean = mean(score),
+                   acc_sd = sd(score),
+                   acc_n = n()
+                   )
+    x <- left_join(y, x, by=grouping_vars)
+  }
+
+  remove <- unique(unlist(lapply(x[grouping_vars],
+                                 function(y) which(is.na(y))
+                                 )
+                          )
+                   )
+  if (length(remove) > 0L) {
+    x <- x[-remove,]
+  }
+  
+  ungroup(x)
+
+}
+```
+
+```{r aggregating}
+# Ignore subjects here since there are too few observations per subject at each level of 
+# nRecalled
+byCond_order_nRecalled <- corrects %>%
+  group_by(class, output_order, nRecalled) %>%
+  summaryFun() %>%
+  filter(RT_n != 0) %>%
+  arrange(class, nRecalled)
+
+byCond_revOrder_nRecalled <- corrects %>%
+  group_by(class, revOrder, nRecalled) %>%
+  summaryFun() %>%
+  arrange(class, nRecalled)
+
+## Group by Subject, condition, and order
+bySubjects_cond_order <- corrects %>%
+  group_by(subject, class, output_order) %>%
+  summaryFun()
+
+## Collapse condition and order over Subjects
+byCond_order <- bySubjects_cond_order %>%
+  WISEsummary(dependentvars = c("acc_mean", "RT_mean", "logRT_mean", "RT_median"),
+              withinvars = c("class","output_order"),
+              idvar = "subject",
+              na.rm = TRUE) %>%
+  rename_(.dots=setNames(names(.),
+                         gsub("_mean$", "", names(.))
+                         )
+          ) %>%
+  select(-RT_median_n, -logRT_mean_n) %>%
+  rename(RT_n = RT_mean_n, acc_n = acc_mean_n)
+
+## Group by subject, condition, and reverse order
+bySubjects_cond_revOrder <- corrects %>%
+  group_by(subject, class, revOrder) %>% 
+  summaryFun()
+
+## Collapse condition and reverse order over Subjects
+byCond_revOrder <- bySubjects_cond_revOrder %>%
+  WISEsummary(dependentvars = c("RT_mean", "logRT_mean", "RT_median"),
+              withinvars = c("class","revOrder"),
+              idvar = "subject",
+              na.rm = TRUE) %>%
+  rename_(.dots=setNames(names(.),
+                         gsub("_mean$", "", names(.))
+                         )
+          ) %>%
+  select(-RT_median_n, -logRT_mean_n) %>%
+  rename(RT_n = RT_mean_n)
+
+## Group by subjects and condition
+bySubjects_cond <- corrects %>%
+  group_by(subject, class) %>%
+  summaryFun()
+
+## Collapse condition over subjects
+byCond <- bySubjects_cond %>%
+  WISEsummary(dependentvars = c("acc_mean", "RT_mean", "logRT_mean", "RT_median"),
+              withinvars = "class",
+              idvar = "subject",
+              na.rm = TRUE) %>%
+  rename_(.dots=setNames(names(.),
+                         gsub("_mean$", "", names(.))
+                         )
+          ) %>%
+  select(-RT_median_n, -logRT_mean_n) %>%
+  rename(RT_n = RT_mean_n, acc_n = acc_mean_n)
+```
+
 ## Subject Performance 
 Left figure shows counts of correct recalls, repeats of correct recalls, and extra
 list intrusions for each list by each type of list (study practice, test practice, no practice). Perfect performance is 15/15 correct. 
 
-Right figure shows latency in seconds to pressing the first key when typing in the word, relative to the last key press of the previous word (or onset of the trial in the case of the first word.) Violin plots are gaussian kernel density estimates of the RT's, bandwidth of 1. 
+Right figure shows latency in seconds to pressing the first key when typing in the word, relative to the last key press of the previous word (or onset of the trial in the case of the first word.) Violin plots are gaussian kernel density estimates of the RT's, bandwidth of 1.
 
-```{r subject,results='asis'}
+```{r subject, results='asis', cache=TRUE}
 allResponseTypesLong <- tested %>% 
   select_(.dots = c(minimal_variables,"intrusions", "repeats")) %>%
   gather(key = "output_type", value = "count", score,intrusions,repeats) %>%
@@ -73,7 +195,7 @@ for (i in unique(tested$subject)){
                    aes(x= cond_list, y=count, fill=output_type)) +
     geom_bar(stat="identity") +
     facet_grid(class~., labeller = labeller(class=class_labels)) +
-    scale_y_continuous(limits=c(0,ymax)) + 
+    scale_y_continuous(limits=c(0,ymax)) +
     scale_fill_manual("Response Type",
                       breaks= c("score","repeats","intrusions"),
                       labels =c(score = "Correct",
@@ -106,54 +228,39 @@ for (i in unique(tested$subject)){
 }
 ```
 
-## Output Position Frequency and RT
-```{r agg_plots}
-agg <- corrects %>%
-  complete(subject, class, output_order, cond_list, fill=list(score=0)) %>%
-  group_by(class,output_order) %>% 
-  summarise(mean_acc = mean(score),
-            sd_acc = sd(score),
-            count = n(),
-            median_RT = median(RT,na.rm=TRUE),
-            sd_RT = sd(RT, na.rm = TRUE),
-            mean_RT = mean(RT,na.rm=TRUE),
-            MAD = mad(RT,na.rm=T,constant = 1)) %>% 
-  mutate(unobs = (1-mean_acc)*count)
-
-aggAccPlot <- ggplot(data = agg,
-                     aes(x=factor(output_order), y=mean_acc, group=class, color=class)) +
-  geom_point(size = 2) +
-  geom_line(size = .75) +
-  geom_errorbar(aes(ymin = mean_acc - sd_acc/sqrt(count), 
-                    ymax = mean_acc + sd_acc/sqrt(count)),
-                linetype=1,
-                width=.3) +   
-  scale_y_continuous("Probability of Recalling at Least x Items") +  
-  scale_x_discrete("Output Position (x)") + 
-  scale_color_manual(name="Practice\nCondition",
-                     labels=c("Baseline","Restudy","Test Practice"),
-                     values = c('black', 'red', '#00cc00')) + 
-  ggtitle("Output Accuracy")
-
-aggRTPlot <- aggAccPlot + aes(y=median_RT) +
-  geom_errorbar(aes(ymin = median_RT-(1*MAD),
-                    ymax = median_RT+(1*MAD)),
-                linetype=1,
-                width=.3) +  
-  scale_y_continuous("Median Inter-Retreival Time of Item x") +
-  ggtitle("Inter-Retrieval Time")
-
-print(aggAccPlot)
-print(aggRTPlot)
-```
-
-## IRTs
-
+## Performance by Output Position
 Output order is computed only for correct responses, but any RT's are measured relative 
 to the item output immediately prior, even if that item is an intrusion or repeat.
+```{r byCond_order}
+byCond_order_acc_plot <- ggplot(data = byCond_order,
+                           aes(x=factor(output_order), y=acc_mean,
+                               group=class, color=class,
+                               ymin = acc_mean - acc_mean_sem,
+                               ymax = acc_mean + acc_mean_sem)) +
+  geom_point(size = 2) +
+  geom_line(size = .75) +
+  geom_errorbar(width=.3) +
+  scale_y_continuous("Probability of Recalling at Least x Items") +  
+  scale_x_discrete("Output Position (x)") +
+  scale_color_manual(name="Practice\nCondition",
+                     labels=c("Baseline","Restudy","Test Practice"),
+                     values = c('black', 'red', '#00cc00')) +
+  ggtitle("Output Accuracy")
 
-```{r revOrder,fig.cap="Error bars represent 2.5 and 97.5 percentiles."}
-RTsummary <- corrects %>%
+byCond_order_RT_plot <- byCond_order_acc_plot + 
+  aes(y=RT_mean,
+      ymin = RT_mean - RT_mean_sem,
+      ymax = RT_mean + RT_mean_sem) +
+  scale_y_continuous("Mean Inter-Retreival Time of Item x") +
+  ggtitle("Inter-Retrieval Time")
+
+print(byCond_order_acc_plot)
+print(byCond_order_RT_plot)
+```
+
+## IRT by Reverse Output Position (All Conditions)
+```{r IRT_by_revOrder, fig.cap="Error bars represent 2.5 and 97.5 percentiles."}
+byRevOrder <- corrects %>%
   filter(!is.na(RT)) %>%
   group_by(revOrder) %>%
   summarise(meanRT = mean(RT),
@@ -161,15 +268,17 @@ RTsummary <- corrects %>%
             upper = quantile(RT, .975),
             lower = quantile(RT, .025))
 
-ggplot(data = RTsummary, 
-       aes(x= factor(revOrder),y=meanRT)) +
-  geom_point(aes(y=RT), data = corrects, 
+ggplot(data = byRevOrder, 
+       aes(x= factor(revOrder), y=meanRT)
+       ) +
+  geom_point(aes(y=RT),
+             data = filter(corrects, !is.na(RT)),
              position = position_jitter(width = .2),
              color="black") + 
   geom_errorbar(mapping = aes(ymax=upper,ymin=lower),
                 width=.25,color="red",size=.75) +
   geom_point(color="red") +
-  geom_line(aes(x=1:15),color="red") + 
+  geom_line(aes(x=revOrder), color="red") + 
   geom_text(aes(label = count, y=-2.5)) +
   scale_x_discrete("Reverse Output Position",
                    labels = c("n", paste("n-",1:14,sep='')))+
@@ -177,28 +286,15 @@ ggplot(data = RTsummary,
   ggtitle("Inter-Retrieval Times by Reverse Output Position")
 ```
 
-```{r IRTs, echo=FALSE}
-corrects %<>% group_by(subject, class, cond_list) %>%
-  summarise(nRecalled = sum(score)) %>%
-  right_join(corrects, by = c("subject", "class", "cond_list")) %>%
-  select(subject, class, cond_list, output_order, revOrder, nRecalled, target:RT) %>%
-  arrange(subject, class, cond_list, output_order)
-
-
-condition_IRTs <- corrects %>%
-  filter(nRecalled >= 3 & nRecalled <= 13) %>%
-  group_by(class, nRecalled, output_order, revOrder) %>%
-  summarise(count = n(),
-            MAD = mad(RT,na.rm=T,constant = 1),
-            median_RT = median(RT,na.rm=TRUE),
-            mean_RT = mean(RT,na.rm=TRUE),
-            sd_RT = sd(RT,na.rm=TRUE)) %>%
-  arrange(class, nRecalled, output_order)
-
+## IRT by Total Recalled & Output Position
+```{r IRT_by_revOrder_and_nRecalled}
 # Forward Order
-forward <- ggplot(filter(condition_IRTs, output_order > 1),
-                  aes(x=output_order, y=mean_RT, color=factor(nRecalled))) +
-  geom_point(aes(size=count)) +
+forward <- ggplot(filter(byCond_order_nRecalled,
+                         output_order > 1,
+                         nRecalled >= 4 & nRecalled <= 12),
+                  aes(x=output_order, y=RT_mean,
+                      color=factor(nRecalled))) +
+  geom_point(aes(size=RT_n)) +
   geom_line(size = .75) +
   facet_grid(class~.,
              labeller = labeller(class=class_labels)
@@ -210,12 +306,22 @@ forward <- ggplot(filter(condition_IRTs, output_order > 1),
   ggtitle("Forward IRTs by Recall Total")
 print(forward)
 
-backward <- forward %+% condition_IRTs + aes(x=revOrder) +
-  xlab("Reverse Output Order") + 
+byCond_revOrder_nRecalled_restricted <- filter(byCond_revOrder_nRecalled,
+                                               nRecalled >= 4 & nRecalled <= 12)
+backward <- forward %+%
+  byCond_revOrder_nRecalled_restricted %+%
+  aes(x=revOrder) +
+  scale_x_continuous("Reverse Output Order",
+                     breaks = seq(max(byCond_revOrder_nRecalled_restricted$revOrder)),
+                     labels = c("n",
+                                paste("n-",
+                                      seq(max(byCond_revOrder_nRecalled_restricted$revOrder)-1)
+                                      )
+                                )
+                     ) +
   ggtitle("Reverse IRTs by Recall Total")
 print(backward)
 ```
-
 
 ## Quantile Plots
 ```{r quantiles}
@@ -248,43 +354,27 @@ ggplot(correct_quantiles,
 
 ## Grand Averages 
 ```{r averages, results="markdown"}
-summary_fun <- function(data) {
-  summarized_data <- summarise(data,
-                               mean_acc = mean(score),
-                               mean_logRT = mean(log(RT),na.rm=TRUE),
-                               mean_RT = mean(RT,na.rm=TRUE))
-}
-
-ANOVAdata <- corrects %>%
-  ungroup() %>%
-  complete(subject,class,output_order, cond_list, fill=list(score=0)) %>%
-  mutate(class = factor(class),
-         subject = factor(subject))
-
-GrandAvg <- ANOVAdata %>%
-  group_by(class) %>% 
-  summary_fun() %>%
-  mutate(class = factor(class))
-
-pander(GrandAvg, style="rmarkdown")
+pander(byCond[c("class", "acc_mean", "RT_mean")],
+       style="rmarkdown")
 ```
 
 ## Accuracy Analysis
 
 ### Accuracy ANOVA 
 ```{r accAnova, fig.width = 4, fig.height=4}
-qplot(x=class,y=mean_acc,data=GrandAvg)
-ANOVAmeans <- ANOVAdata %>%
-  group_by(subject,class) %>% 
-  summary_fun()
-accAnova <- aov(mean_acc~class + Error(subject/class), data = ANOVAmeans)  
+qplot(x=class,y=acc_mean,data=byCond)
+
+accAnova <- aov(acc_mean~ class + Error(subject/class),
+                data = mutate_at(bySubjects_cond, c("subject","class"), factor))  
 pander(summary(accAnova), style="rmarkdown")
 ```
 
 ### Accuracy Contrasts
 ```{r acc_contrasts}
 acc_t_contrasts <- combn(c("np","sp","tp"), 2, FUN = t_summary, simplify=FALSE,
-                        formula = mean_acc ~ class, data = ANOVAmeans, paired=TRUE)
+                         formula = acc_mean ~ class,
+                         data = bySubjects_cond,
+                         paired=TRUE)
 names(acc_t_contrasts) <- vapply(acc_t_contrasts, attr, FUN.VALUE = character(1), "pair")
 acc_t_contrasts <- as.data.frame(do.call(rbind, acc_t_contrasts))
 acc_t_contrasts$p <- p.adjust(acc_t_contrasts$p, method = "bonferroni")
@@ -293,19 +383,164 @@ pander(acc_t_contrasts)
 
 ## RT Analysis
 
-### RT ANOVA
+### log-RT ANOVA
 ```{r rt_anova, fig.width = 4, fig.height=4}
-qplot(x=class,y=mean_RT,data=GrandAvg)
-RTanova <- aov(mean_logRT~class + Error(subject/class), data = ANOVAmeans)  
+qplot(x=class,y=RT_mean,data=byCond)
+RTanova <- aov(logRT_mean ~ class + Error(subject/class),
+                data = mutate_at(bySubjects_cond, c("subject","class"), factor))  
 pander(summary(RTanova), style="rmarkdown")
+
+# RTanova_refit <- aov(logRT_mean ~ class + subject,
+#                      data = mutate_at(bySubjects_cond, c("subject","class"), factor))
+# plot(RTanova_refit, 1)
+# plot(RTanova_refit, 2)
+# shapiro.test(residuals(RTanova_refit))
+
+x <- proj(RTanova)
+qqnorm(x[["subject:class"]][,'Residuals'])
+qqline(x[["subject:class"]][,'Residuals'])
+shapiro.test(x[["subject:class"]][,'Residuals'])
 ```
 
-### RT Contrasts
+### log-RT Contrasts
 ```{r RT_contrasts}
 RT_t_contrasts <- combn(c("np","sp","tp"), 2, FUN = t_summary, simplify=FALSE,
-                        formula = mean_logRT ~ class, data = ANOVAmeans, paired=TRUE)
+                        formula = logRT_mean ~ class,
+                        data = bySubjects_cond,
+                        paired=TRUE)
 names(RT_t_contrasts) <- vapply(RT_t_contrasts, attr, FUN.VALUE = character(1), "pair")
 RT_t_contrasts <- as.data.frame(do.call(rbind, RT_t_contrasts))
 RT_t_contrasts$p <- p.adjust(RT_t_contrasts$p, method = "bonferroni")
 pander(RT_t_contrasts)
+```
+
+## Output Order Correlation
+```{r gamma_correlation, eval=FALSE}
+x <- corrects %>%
+  select(subject, cond_list, class, resp,target) %>%
+  filter(class %in% c("np","tp"),
+         !is.na(resp)) %>%
+  arrange(subject, cond_list, class) %>%
+  group_by(subject, cond_list) %>%
+  filter(c(resp[class=="np"] %in% resp[class=="tp"],
+           resp[class=="tp"] %in% resp[class=="np"])) %>%
+  group_by(subject, cond_list, class) %>%  
+  mutate(rank = row_number()) %>%
+  group_by(subject, cond_list) %>%
+  mutate(rank = replace(rank,
+                        class=="tp",
+                        match(resp[class=="tp"],
+                              resp[class=="np"])
+                        )
+         ) %>%
+  ungroup()
+
+y <- x %>%
+  group_by(subject, cond_list) %>%
+  summarise(gamma = rococo(rank[class=="np"], rank[class=="tp"])) %>%
+  summarise(gamma = mean(gamma),
+            gamma_z = atanh(gamma)) # fischer-z transformed the correlation
+
+t.test(y$gamma_z)
+```
+
+```{r equal_n_dataset}
+max_complete <- byCond_revOrder %>%
+  filter(RT_n == 34L) %>%
+  group_by(class) %>%
+  summarise(max_position = max(revOrder))
+
+byCond_revOrder_noMissing <- filter(byCond_revOrder,
+                                    revOrder <= min(max_complete$max_position))
+```
+
+## Final Figures
+```{r pub_figures, dev='svglite'}
+byCond_acc_plot <- ggplot(byCond,
+                          aes(x=" ",
+                              y=acc_mean*100,
+                              ymin = acc_mean_CI_lower*100,
+                              ymax = acc_mean_CI_upper*100,
+                              shape = class)) +
+  geom_point(size=3,
+             position=position_dodge(.2)) +
+  geom_errorbar(width=.25,
+                position=position_dodge(.2)) +
+  scale_shape_discrete(guide=FALSE) +
+  scale_x_discrete(" ") +
+  scale_y_continuous("Percent Correct") +
+  theme_bw(base_size = 16) +
+  theme(axis.ticks.x = element_blank(),
+        panel.grid = element_blank())
+
+byCond_revOrder_RTplot <- ggplot(byCond_revOrder_noMissing,
+                                 aes(x=revOrder, y=logRT_mean,
+                                     ymin = logRT_mean - logRT_mean_sem,
+                                     ymax = logRT_mean + logRT_mean_sem,
+                                     shape = class)) +
+  geom_point(size=3) +
+  geom_line(size=.75) +
+  geom_errorbar(width=.15) +
+  scale_shape_discrete(name="Practice\nCondition",
+                       labels=c("Baseline","Restudy","Test Practice")) +
+  scale_x_continuous("Reverse Output Position",
+                     breaks=1:max(byCond_revOrder_noMissing$revOrder),
+                     labels = c("n",
+                                paste("n-", 1:(max(byCond_revOrder_noMissing$revOrder)-1),
+                                      sep=''))) +
+  scale_y_continuous("Mean log IRT",
+                     breaks=seq(round(min(byCond_revOrder_noMissing$logRT_mean),0),
+                                round(max(byCond_revOrder_noMissing$logRT_mean),0),
+                                by=.5)) +
+  theme_bw(base_size = 16) +
+  theme(legend.position = c(.75, .7),
+        panel.grid = element_blank())
+
+g <- arrangeGrob(byCond_acc_plot, byCond_revOrder_RTplot,
+                 nrow=1, ncol=2, widths=c(.25, 1))
+grid.draw(g)
+```
+
+### RT ~ Reverse-Order x Condition ANOVA
+```{r pub_analysis}
+revOrder_RTanova <- aov(logRT_mean ~ class*revOrder + Error(subject/(class*revOrder)),
+                        data = filter(bySubjects_cond_revOrder,
+                                      revOrder <= min(max_complete$max_position)) %>%
+                               mutate_at(c("subject","class", "revOrder"),
+                                         factor))
+pander(summary(revOrder_RTanova), style="rmarkdown")
+
+RT_t_contrasts <- combn(c("np","sp","tp"), 2, FUN = t_summary, simplify=FALSE,
+                        formula = logRT_mean ~ class,
+                        data = filter(bySubjects_cond_revOrder,
+                                      revOrder <= min(max_complete$max_position)),
+                        paired=TRUE)
+names(RT_t_contrasts) <- vapply(RT_t_contrasts, attr, FUN.VALUE = character(1), "pair")
+RT_t_contrasts <- as.data.frame(do.call(rbind, RT_t_contrasts))
+RT_t_contrasts$p <- p.adjust(RT_t_contrasts$p, method = "bonferroni")
+pander(RT_t_contrasts)
+```
+
+```{r test_assumptions, fig.height=4, fig.width=5, results="asis"}
+x <- proj(revOrder_RTanova)
+
+qqnorm(x[["subject:class"]][,'Residuals'])
+qqline(x[["subject:class"]][,'Residuals'])
+
+pander(shapiro.test(x[["subject:class"]][,'Residuals']),
+       "Shapiro-Wilk normality test: subject:class",
+       style="rmarkdown")
+
+qqnorm(x[["subject:revOrder"]][,'Residuals'])
+qqline(x[["subject:revOrder"]][,'Residuals'])
+
+pander(shapiro.test(x[["subject:revOrder"]][,'Residuals']),
+       "Shapiro-Wilk normality test: subject:revOrder",
+       style="rmarkdown")
+
+qqnorm(x[["subject:class:revOrder"]][,'Residuals'])
+qqline(x[["subject:class:revOrder"]][,'Residuals'])
+pander(shapiro.test(x[["subject:class:revOrder"]][,'Residuals']),
+       "Shapiro-Wilk normality test: subject:class:revOrder",
+       style="rmarkdown")
 ```
