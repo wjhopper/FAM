@@ -450,6 +450,7 @@ pander(t.test(gamma_correlations$gamma_z),
        style="rmarkdown")
 ```
 
+## Final Figures
 ```{r equal_n_dataset}
 max_complete <- byCond_revOrder %>%
   filter(RT_n == 34L) %>%
@@ -458,9 +459,11 @@ max_complete <- byCond_revOrder %>%
 
 byCond_revOrder_noMissing <- filter(byCond_revOrder,
                                     revOrder <= min(max_complete$max_position))
+
+bySubjects_cond_revOrder_noMissing <- filter(bySubjects_cond_revOrder,
+                                             revOrder <= min(max_complete$max_position))
 ```
 
-## Final Figures
 ```{r pub_figures, dev='svglite'}
 byCond_acc_plot <- ggplot(byCond,
                           aes(x=" ",
@@ -510,16 +513,17 @@ grid.draw(g)
 ### RT ~ Reverse-Order x Condition ANOVA
 ```{r pub_analysis}
 revOrder_RTanova <- aov(logRT_mean ~ class*revOrder + Error(subject/(class*revOrder)),
-                        data = filter(bySubjects_cond_revOrder,
-                                      revOrder <= min(max_complete$max_position)) %>%
+                        data = bySubjects_cond_revOrder_noMissing %>%
                                mutate_at(c("subject","class", "revOrder"),
-                                         factor))
+                                         factor)
+                        )
 pander(summary(revOrder_RTanova), style="rmarkdown")
 
 RT_t_contrasts <- combn(c("np","sp","tp"), 2, FUN = t_summary, simplify=FALSE,
                         formula = logRT_mean ~ class,
-                        data = filter(bySubjects_cond_revOrder,
-                                      revOrder <= min(max_complete$max_position)),
+                        data = group_by(bySubjects_cond_revOrder_noMissing,
+                                        subject, class) %>%
+                               summarise(logRT_mean = mean(logRT_mean)),
                         paired=TRUE)
 names(RT_t_contrasts) <- vapply(RT_t_contrasts, attr, FUN.VALUE = character(1), "pair")
 RT_t_contrasts <- as.data.frame(do.call(rbind, RT_t_contrasts))
