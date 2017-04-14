@@ -415,12 +415,11 @@ pander(RT_t_contrasts)
 ```
 
 ## Output Order Correlation
-```{r gamma_correlation, eval=FALSE}
-x <- corrects %>%
-  select(subject, cond_list, class, resp,target) %>%
+```{r gamma_correlation, fig.height=4, fig.width=5, results="asis"}
+ranks <- corrects %>%
+  select(subject, cond_list, class, resp, target) %>%
   filter(class %in% c("np","tp"),
          !is.na(resp)) %>%
-  arrange(subject, cond_list, class) %>%
   group_by(subject, cond_list) %>%
   filter(c(resp[class=="np"] %in% resp[class=="tp"],
            resp[class=="tp"] %in% resp[class=="np"])) %>%
@@ -435,13 +434,20 @@ x <- corrects %>%
          ) %>%
   ungroup()
 
-y <- x %>%
+gamma_correlations <- ranks %>%
   group_by(subject, cond_list) %>%
-  summarise(gamma = rococo(rank[class=="np"], rank[class=="tp"])) %>%
-  summarise(gamma = mean(gamma),
-            gamma_z = atanh(gamma)) # fischer-z transformed the correlation
+  do(bind_cols(distinct(.[c("subject","cond_list")]),
+               as_data_frame(t(rank_agreements(x = .$rank[.$class=="np"],
+                                               y = .$rank[.$class=="tp"])))
+               ))  %>%
+  group_by(subject) %>%
+  summarise_at(c("concordances","discordances"), sum) %>%
+  mutate(gamma = (concordances-discordances)/(concordances+discordances),
+         gamma_z = atanh(gamma)) # fischer-z transformed the correlation
 
-t.test(y$gamma_z)
+hist(gamma_correlations$gamma, xlab="gamma")
+pander(t.test(gamma_correlations$gamma_z),
+       style="rmarkdown")
 ```
 
 ```{r equal_n_dataset}
