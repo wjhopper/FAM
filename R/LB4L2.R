@@ -30,130 +30,46 @@
 #' @importFrom magrittr %>% %<>%
 #' @importFrom tidyr expand_ replace_na
 #' @export
-summary.LB4L <- function(data, level = c("subject", "group", "raw"),
-                         given_practice = FALSE,
-                         conditional = FALSE,
-                         given_data = NULL) {
+summary.LB4L <- function(data, level = "subject") {
 
-  level <- match.arg(tolower(level), c("subject", "group", "raw"))
+  level <- match.arg(tolower(level), c("subject"))
 
   if (!all(c("acc","RT") %in% names(data))) {
     stop(paste("Variables 'acc' and 'RT' not found in this data set"))
   }
 
-  if (!is.numeric(given_practice) && !is.logical(given_practice)) {
-    stop("'given_practice' must be logical scalars or numeric vectors")
-  }
-
-  if (conditional && !any(given_practice > 0)) {
-    stop('"given_practice" can not be FALSE if "conditional" is TRUE')
-  }
-
-  data <- rename(data, final_acc = acc, final_RT = RT)
-
-  if (any(given_practice > 0)) {
-
-    if (is.null(given_data)) {
-      given_data <- get(attr(data,"tables")$test_practice)
-    }
-
-    if (is.numeric(given_practice)) {
-
-      if ("round" %in% names(given_data)) {
-        rounds <- unique(given_data$round)
-      } else {
-        given_data$round <- rounds <- 1
-      }
-
-      if (!setequal(given_practice, rounds)) {
-        given_data <- filter(given_data, round %in% given_practice)
-      }
-    }
-  }
-
-  include <- character(0)
-  if (!is.null(given_data)) {
-    data <- ungroup(data) %>%
-      select(subject:target, final_acc, final_RT) %>%
-      left_join(x = reshaping(given_data),
-                y = ., by = c("subject", "group", "list", "target")) %>%
-      select(subject:list, pracCue = cue.x, finalCue = cue.y,
-             target, sameCue, starts_with("practice"), final_acc, final_RT)
-
-    if (conditional) {
-      DVname <- "conditional_p"
-      include <- grep("^practice[0-9]acc", names(data), value = TRUE)
-    }  else {
-      DVname <- "joint_p"
-    }
-  } else {
-    DVname <- "mean_p"
-  }
-
-  if (level == "raw") {
-    return(data)
-  }
+  data$logRT <- log(data$RT)
 
   orig_groups <- sapply(groups(data), as.character)
-  new_groups <- grep("acc$", names(data), value = TRUE)
-  all_groups <- n_grouping <- c(orig_groups, new_groups)
+  all_groups <-  c(orig_groups, "acc")
   fill_vars <- grep("\\w*practice$|group", all_groups, value=TRUE, invert=TRUE)
 
-  possible_n <- group_by_(data, .dots = c(orig_groups, include)) %>%
+  possible_n <- group_by_(data, .dots = orig_groups) %>%
     summarise(cell_max = n())
   fill_frame <- do.call(expand.grid, c(lapply(data[,fill_vars],  unique),
                                        list(stringsAsFactors = FALSE))) %>%
-    left_join(distinct(select(ungroup(possible_n),subject,group)), by="subject") %>%
-    left_join(possible_n, by = names(.)[names(.) %in% names(possible_n)])
-
-  prac_RTcols <- grep("practice[0-9]+RT", names(data), value = TRUE)
-  prac_RT_funs <- lapply(prac_RTcols, function(x) {
-    as.formula(paste0("~median(", x, ", na.rm = TRUE)"))
-    }) %>%
-    setNames(prac_RTcols)
+    left_join(distinct(ungroup(possible_n), subject, group),
+              by="subject") %>%
+    left_join(possible_n, by = intersect(names(.), names(possible_n)))
 
   summarized_data <- data %>%
-    group_by_(.dots = new_groups, add = TRUE) %>%
-    summarise_(freq = ~n(),
-               RT = ~median(final_RT, na.rm = TRUE),
-               nRT = ~sum(!is.na(final_RT)),
-               .dots = prac_RT_funs) %>%
+    group_by_(.dots = all_groups, add = TRUE) %>%
+    summarise(RT_median = median(RT, na.rm = TRUE),
+              RT_mean = mean(RT, na.rm = TRUE),
+              logRT_mean = mean(logRT, na.rm = TRUE),
+              RT_sd = sd(RT, na.rm = TRUE),
+              MAD = mad(RT, na.rm = T, constant = 1),
+              N = sum(!is.na(RT))
+    ) %>%
     right_join(y = fill_frame, by = intersect(names(.), names(fill_frame))) %>%
     ungroup() %>%
-    mutate(freq = ifelse(is.na(freq) & !is.na(cell_max), 0, freq),
-           p = ifelse(is.na(freq), NA_real_, freq/cell_max))
+    mutate(N = replace(N, is.na(N), 0),
+           p = N/cell_max) %>%
+    arrange(subject)
 
-  if (level == "group") {
-    summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"])
-    N <- summarise(summarized_data,
-                   nObs = sum(freq, na.rm=TRUE),
-                   nRT = sum(nRT, na.rm=TRUE),
-                   N = n())
-    summarized_data %<>% group_by_(.dots = all_groups[all_groups != "subject"]) %>%
-      summarise_each(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)), p, RT) %>%
-      left_join(N, by = intersect(names(.), names(N))) %>%
-      mutate(sem_p = p_sd/sqrt(N),
-             sem_RT = RT_sd/sqrt(N)) %>%
-      ungroup()
-  }
-
-  DVcols <- grep("^p(?:_)", names(summarized_data), value = TRUE, perl = TRUE)
-  newDVcols <- sapply(strsplit(DVcols, "_"), function(x) paste(rev(x), collapse = "_"))
-  newDVcols[grepl("^mean|^p$", newDVcols)] <- DVname
-  RTcols <- grep("^RT", names(summarized_data), value = TRUE)
-  newRTcols <- sapply(strsplit(RTcols, "_"), function(x) paste(rev(x), collapse = "_"))
-
-  summarized_data %<>% rename_(.dots = setNames(c(DVcols, RTcols), c(newDVcols,  newRTcols)))
-  conditions <- sum(grepl("^practice[0-9]+", names(summarized_data)))
-  if (conditions >= 1) {
-    summarized_data %<>% as_LB4L_CD_summary()
-  } else {
-    summarized_data %<>%  as_LB4L_summary()
-  }
-
+  summarized_data %<>%  as_LB4L_summary()
   return(summarized_data)
 }
-
 
 # Internal function for de-normalizing the test practice data to make a column
 # for each round of test practice
