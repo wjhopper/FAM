@@ -88,8 +88,6 @@ calculate_quantiles <- function(data,
    data
 }
 
-IV_sub <- summary(LB4L2_final, level = "subject")
-
 quantile_points <- seq(.01,1,length.out = 100)
 
 quantiles_correct <- IV_sub %>%
