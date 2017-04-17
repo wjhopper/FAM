@@ -7,28 +7,13 @@
 #'
 #' @param data An LB4L data set from the FAM package.
 #' @param level A character vector of length one, used for determing the level
-#' of the summary. If the value is \code{"subject"} (the default) then the means
+#' of the summary. If the value is \code{"subject"} (the default) then the summary statistics
 #' for each subject are returned. If the value is \code{"group"} then the means
-#' of each experimental condition is returned, aggregated over individual subjects.
-#' If the value is "raw", then the raw data is returned without any aggregation.
-#' This options is useful along with \code{given_practice = TRUE} to retreive the
-#' raw joint data.
-#' @param given_practice A numeric vector listing which practice tests should be
-#' used as grouping variables for calculating conditional final test averages. A logical
-#' vector of length one (i.e., \code{TRUE} or \code{FALSE} can be used to indicate
-#' all practice tests should be used, or no practice test should be used.
-#' @param conditional A logical scalar indicating whether or not analysis should
-#' condition on practice test performance. If \code{FALSE}, and given_practice is
-#' not \code{FALSE}, a joint analysis of practice and final test outcomes is performed.
-#' @param given_data The dataset to use for conditional or joint analysis. If not
-#' supplied, the datset specified in the "test_practice" field of the "tables" list
-#' attribute of the dataset given as the \code{data} argument.
-#'
+#' of each experimental condition is returned, pooled across individual subjects.
+
 #' @note Trials where no keys were pressed by the participant are excluded from
 #' the RT summary.
 #'
-#' @importFrom magrittr %>% %<>%
-#' @importFrom tidyr expand_ replace_na
 #' @export
 summary.LB4L <- function(data, level = "subject") {
 
@@ -67,10 +52,10 @@ summary.LB4L <- function(data, level = "subject") {
            p = N/cell_max) %>%
     arrange(subject)
 
-  summarized_data %<>%  as_LB4L_summary()
-  return(summarized_data)
+  return(as_LB4L_summary(summarized_data))
 }
 
+#' @export
 summary.LB4L_summary <- function(data) {
 
   data <- filter(data, acc == 1) %>%
@@ -86,6 +71,26 @@ summary.LB4L_summary <- function(data) {
     select(-RT_median_n, -logRT_mean_n) %>%
     rename(RT_n = RT_mean_n)
 }
+
+#' @export
+recode_conditions <- function(data) {
+
+  x <- paste0(data$practice,data$OCpractice)
+  data$Condition <- "N"
+  data$Condition[grepl("S", x)] <- "S"
+  data$Condition[grepl("T", x)] <- "T"
+
+  data$cue_type <- NA
+  same <- data$OCpractice =="N" & data$practice != "N"
+  data$cue_type[same] <- "Same Cue"
+  other <- data$OCpractice !="N" & data$practice == "N"
+  data$cue_type[other] <- "Other Cue"
+
+  data <- select(data, -practice, -OCpractice)
+  data <- rename(data, practice = Condition)
+  return(data)
+}
+
 
 # Internal function for de-normalizing the test practice data to make a column
 # for each round of test practice

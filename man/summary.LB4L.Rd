@@ -4,32 +4,15 @@
 \alias{summary.LB4L}
 \title{Summarizing the raw LB4L2 dataset by the experimentally manipulated factors}
 \usage{
-\method{summary}{LB4L}(data, level = c("subject", "group", "raw"),
-  given_practice = FALSE, conditional = FALSE, given_data = NULL)
+\method{summary}{LB4L}(data, level = "subject")
 }
 \arguments{
 \item{data}{An LB4L data set from the FAM package.}
 
 \item{level}{A character vector of length one, used for determing the level
-of the summary. If the value is \code{"subject"} (the default) then the means
+of the summary. If the value is \code{"subject"} (the default) then the summary statistics
 for each subject are returned. If the value is \code{"group"} then the means
-of each experimental condition is returned, aggregated over individual subjects.
-If the value is "raw", then the raw data is returned without any aggregation.
-This options is useful along with \code{given_practice = TRUE} to retreive the
-raw joint data.}
-
-\item{given_practice}{A numeric vector listing which practice tests should be
-used as grouping variables for calculating conditional final test averages. A logical
-vector of length one (i.e., \code{TRUE} or \code{FALSE} can be used to indicate
-all practice tests should be used, or no practice test should be used.}
-
-\item{conditional}{A logical scalar indicating whether or not analysis should
-condition on practice test performance. If \code{FALSE}, and given_practice is
-not \code{FALSE}, a joint analysis of practice and final test outcomes is performed.}
-
-\item{given_data}{The dataset to use for conditional or joint analysis. If not
-supplied, the datset specified in the "test_practice" field of the "tables" list
-attribute of the dataset given as the \code{data} argument.}
+of each experimental condition is returned, pooled across individual subjects.}
 }
 \description{
 The LB4L2 experiment data is stored in 4 different data sets, each corresponding
