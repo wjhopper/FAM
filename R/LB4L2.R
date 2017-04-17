@@ -71,6 +71,22 @@ summary.LB4L <- function(data, level = "subject") {
   return(summarized_data)
 }
 
+summary.LB4L_summary <- function(data) {
+
+  data <- filter(data, acc == 1) %>%
+    WISEsummary(dependentvars = c("p", "RT_mean", "logRT_mean", "RT_median"),
+                betweenvars = "group",
+                withinvars = c("practice","OCpractice"),
+                idvar = "subject",
+                na.rm = TRUE) %>%
+    rename_(.dots=setNames(names(.),
+                           gsub("_mean$", "", names(.))
+                           )
+            ) %>%
+    select(-RT_median_n, -logRT_mean_n) %>%
+    rename(RT_n = RT_mean_n)
+}
+
 # Internal function for de-normalizing the test practice data to make a column
 # for each round of test practice
 #' @importFrom tidyr spread_

@@ -33,6 +33,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.align='center', fig.wid
 ```{r tests, include=FALSE, eval=FALSE}
 # IV <- summary(LB4L2_final, level = "group")
 bySubject_group_prac_OCprac <- summary(LB4L2_final, level = "subject")
+byGroup_prac_OCprac <- summary(bySubject_group_prac_OCprac)
 
 # CD <- summary(LB4L2_final, level = "group", given_practice = TRUE, conditional = TRUE) 
 # identical(summary(LB4L2_final, level = "group", given_practice = 1:2, conditional = TRUE), CD)
