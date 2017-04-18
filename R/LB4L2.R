@@ -42,8 +42,6 @@ summary.LB4L <- function(data, level = "subject") {
     summarise(RT_median = median(RT, na.rm = TRUE),
               RT_mean = mean(RT, na.rm = TRUE),
               logRT_mean = mean(logRT, na.rm = TRUE),
-              RT_sd = sd(RT, na.rm = TRUE),
-              MAD = mad(RT, na.rm = T, constant = 1),
               N = sum(!is.na(RT))
     ) %>%
     right_join(y = fill_frame, by = intersect(names(.), names(fill_frame))) %>%

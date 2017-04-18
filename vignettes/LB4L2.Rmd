@@ -27,14 +27,99 @@ library(dplyr)
 library(tidyr)
 library(whoppeR)
 library(ggplot2)
+library(grid)
+library(gridExtra)
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.align='center', fig.width = 8)
 ```
 
-```{r tests, include=FALSE, eval=FALSE}
+```{r}
 # IV <- summary(LB4L2_final, level = "group")
 bySubject_group_prac_OCprac <- summary(LB4L2_final, level = "subject")
 byGroup_prac_OCprac <- summary(bySubject_group_prac_OCprac)
-byGroup_prac_OCprac <- recode_conditions(byGroup_prac_OCprac)
+```
+
+```{r difference_sem_plot, dev="svglite"}
+diff_bySubject_group_prac_OCprac <- bySubject_group_prac_OCprac %>%
+  filter(acc==1) %>%
+  select(-acc, -N, -cell_max) %>%
+  gather(key="var", value="value", p, RT_median, RT_mean, logRT_mean) %>%
+  unite(condition, practice, OCpractice, sep=".") %>%
+  spread(condition, value) %>%
+  group_by(subject, var) %>%
+  mutate_at(c("N.S", "N.T", "S.N", "T.N"),
+            funs(. - N.N)) %>%
+  ungroup() %>%
+  select(-N.N) %>%
+  gather(key="cond", value="value", N.S, N.T, S.N, T.N) %>%
+  separate(cond, into = c("practice", "OCpractice"),sep = "\\.") %>%
+  spread(var,value) %>%
+  recode_conditions()
+
+diff_byGroup_prac_OCprac <- diff_bySubject_group_prac_OCprac %>%
+  group_by(group, practice, cue_type) %>%
+  summarise_at(c("p","logRT_mean","RT_mean","RT_median"),
+            funs(sem = whoppeR::sem(., na.rm=TRUE))
+            )  %>%
+  rename_(.dots=setNames(names(.),
+                         gsub("_mean$", "", names(.))
+                         )
+          )
+
+intervention <- filter(byGroup_prac_OCprac, !(practice == "N" & OCpractice == "N")) %>%
+  select(group, practice, OCpractice, p, RT_mean, logRT_mean, RT_median) %>%
+  recode_conditions() %>%
+  left_join(diff_byGroup_prac_OCprac)
+
+control <- filter(byGroup_prac_OCprac, practice == "N", OCpractice == "N") %>%
+  select(group, practice, OCpractice, p, RT_mean, logRT_mean, RT_median) %>%
+  recode_conditions() %>%
+  mutate(p_sem = NA, RT_mean_sem = NA, logRT_mean_sem = NA, RT_median_sem = NA)
+control <- rbind(mutate(control, cue_type = "Same Cue"),
+                 mutate(control, cue_type = "Other Cue")
+                 )
+
+theme_set(theme_bw(base_size = 16) +
+          theme(plot.title = element_text(hjust = .5),
+                axis.title = element_text(size=12)))
+acc <- ggplot(bind_rows(control,intervention),
+              aes(x=group, y=p,
+                  ymax = p + p_sem,
+                  ymin = p - p_sem,
+                  shape = practice, group=practice)) +
+  geom_point(size = 2) +
+  geom_line() +
+  geom_errorbar(width=.15, na.rm=TRUE) +
+  facet_grid(cue_type ~ .) +
+  scale_x_discrete("Group",
+                   limits=c("immediate","delay"),
+                   labels=c("Immediate","Delay")) + 
+  scale_y_continuous("Proportion Correct") +
+  scale_shape_discrete(guide=FALSE) +
+
+  ggtitle("Accuracy") + 
+  theme(strip.text.y = element_blank(),
+        strip.background = element_blank())
+
+  
+RT <- acc %+%
+  aes(y = RT_mean,
+      ymin = RT_mean - RT_mean_sem,
+      ymax = RT_mean + RT_mean_sem) + 
+  scale_y_continuous("Mean R.T. (seconds)") +
+  scale_shape_discrete("Practice",
+                       labels = c("Control","Study Practice", "Test Practice")) +
+  ggtitle("Reaction Time") +
+  theme(strip.text.y = element_text(angle=0,
+                                    size = 18,
+                                    margin = margin(l=8)),
+        strip.background = element_blank(),
+        legend.margin = margin(l=-90))
+
+g <- arrangeGrob(acc, RT,
+                 nrow = 1,
+                 ncol = 2,
+                 widths = c(.4, .6))
+grid.draw(g)
 
 # CD <- summary(LB4L2_final, level = "group", given_practice = TRUE, conditional = TRUE) 
 # identical(summary(LB4L2_final, level = "group", given_practice = 1:2, conditional = TRUE), CD)
@@ -71,6 +156,29 @@ byGroup_prac_OCprac <- recode_conditions(byGroup_prac_OCprac)
 # autoplot(joint_1, DV = "RT")
 ```
 
+```{r}
+  # transmute(subject, group,
+  #           N.S.p = N.S.p - N.N.p,
+  #           N.T.p = N.T.p - N.N.p,
+  #           S.N.p = S.N.p - N.N.p,
+  #           T.N.p = T.N.p - N.N.p,            
+  #           N.S.logRT_mean = N.S.logRT_mean - N.N.logRT_mean,
+  #           N.T.logRT_mean = N.T.logRT_mean - N.N.logRT_mean,
+  #           S.N.logRT_mean = S.N.logRT_mean - N.N.logRT_mean,
+  #           T.N.logRT_mean = T.N.logRT_mean - N.N.logRT_mean,
+  #           N.S.RT_mean = N.S.RT_mean -N.N.RT_mean,
+  #           N.T.RT_mean = N.T.RT_mean -N.N.RT_mean,
+  #           S.N.RT_mean = S.N.RT_mean -N.N.RT_mean,
+  #           T.N.RT_mean = T.N.RT_mean -N.N.RT_mean,
+  #           N.S.RT_median = N.S.RT_median - N.N.RT_median,
+  #           N.T.RT_median = N.T.RT_median - N.N.RT_median,
+  #           S.N.RT_median = S.N.RT_median - N.N.RT_median,
+  #           T.N.RT_median = T.N.RT_median - N.N.RT_median) %>%
+  # gather(key="var", value="value", -subject, -group) %>%
+  # separate(var, into = c("practice", "OCpractice", "var"),sep = "\\.") %>%
+  # spread(var,value) %>%
+  # recode_conditions()
+```
 
 ## Quantile Plots
 ```{r quantiles, fig.height=8,fig.width = 11, include=FALSE}
