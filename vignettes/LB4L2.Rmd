@@ -29,6 +29,7 @@ library(whoppeR)
 library(ggplot2)
 library(grid)
 library(gridExtra)
+library(pander)
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.align='center', fig.width = 8)
 ```
 
@@ -136,10 +137,36 @@ grid.draw(g)
 ```
 
 ## Accuracy and RT by Experimental Condition
-```{r IV, }
-# IV <- summary(LB4L2_final, level = "group")
-# autoplot(IV, DV = "accuracy")
-# autoplot(IV, DV = "RT")
+```{r IV}
+anova_data <- bySubject_group_prac_OCprac %>%
+  filter( acc ==1 ) %>%
+  mutate(subject = factor(subject),
+         condition = interaction( practice,  OCpractice )
+         )
+model <- . ~ group * condition + Error(subject/condition)
+
+model[[2]] <- quote(p)
+acc_anova <- aov(p ~ group * condition + Error(subject/condition),
+                 data = anova_data)
+pander(summary(acc_anova))
+
+model[[2]] <- quote(RT_median)
+RT_median_anova <- aov(model,
+                data = group_by(anova_data, subject) %>%
+                       summarise(missing = anyNA(RT_median)) %>%
+                       filter(!missing) %>%
+                       inner_join(anova_data, by="subject")
+                )
+pander(summary(RT_median_anova))
+
+model[[2]] <- quote(logRT_mean)
+logRT_anova <- aov(model,
+                data = group_by(anova_data, subject) %>%
+                       summarise(missing = anyNA(logRT_mean)) %>%
+                       filter(!missing) %>%
+                       inner_join(anova_data, by="subject")
+                )
+pander(summary(logRT_anova))
 ```
 
 ## Conditional Accuracy and RT
