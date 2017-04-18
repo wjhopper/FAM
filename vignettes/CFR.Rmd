@@ -462,34 +462,75 @@ byCond_revOrder_noMissing <- filter(byCond_revOrder,
 
 bySubjects_cond_revOrder_noMissing <- filter(bySubjects_cond_revOrder,
                                              revOrder <= min(max_complete$max_position))
+
 ```
 
+```{r}
+diff_bySubjects_cond <- bySubjects_cond %>%
+  select(subject, class, acc_mean) %>%
+  spread(class, acc_mean) %>%
+  mutate_at(c("sp", "tp"),
+            funs(. - np)) %>%
+  select(-np) %>%
+  gather(key="class", value="acc_mean", sp, tp)
+
+diff_byCond <- diff_bySubjects_cond %>%
+  group_by(class) %>%
+  summarise(sem = whoppeR::sem(acc_mean, na.rm=TRUE))  %>%
+  rbind(data.frame(class="np", sem=NA)) %>%
+  left_join(select(byCond, class, acc_mean),
+            by="class")
+
+diff_bySubjects_cond_revOrder_noMissing <- bySubjects_cond_revOrder_noMissing %>%
+  select(subject, class, revOrder, logRT_mean) %>%
+  spread(class, logRT_mean) %>%
+  group_by(revOrder) %>%
+  mutate_at(c("sp", "tp"),
+          funs(. - np)) %>%
+  ungroup() %>%
+  select(-np) %>%
+  gather(key="class", value="logRT_mean", sp, tp)
+
+diff_byCond_revOrder_noMissing <- diff_bySubjects_cond_revOrder_noMissing %>%
+  group_by(class, revOrder) %>%
+  summarise(sem = whoppeR::sem(logRT_mean, na.rm=TRUE))  %>%  
+  bind_rows(data.frame(class="np", 
+                   revOrder=unique(byCond_revOrder_noMissing$revOrder),
+                   sem=NA)
+        ) %>%
+  left_join(select(byCond_revOrder_noMissing, class, revOrder, logRT_mean),
+            by=c("class","revOrder"))  
+```
+
+
 ```{r pub_figures, dev='svglite'}
-byCond_acc_plot <- ggplot(byCond,
+byCond_acc_plot <- ggplot(diff_byCond,
                           aes(x=" ",
-                              y=acc_mean*100,
-                              ymin = acc_mean_CI_lower*100,
-                              ymax = acc_mean_CI_upper*100,
+                              y=acc_mean,
+                              ymin = acc_mean - sem,
+                              ymax = acc_mean + sem,
                               shape = class)) +
   geom_point(size=3,
              position=position_dodge(.2)) +
   geom_errorbar(width=.25,
-                position=position_dodge(.2)) +
+                position=position_dodge(.2),
+                na.rm=TRUE) +
   scale_shape_discrete(guide=FALSE) +
   scale_x_discrete(" ") +
-  scale_y_continuous("Percent Correct") +
+  scale_y_continuous("Proportion Correct") +
   theme_bw(base_size = 16) +
   theme(axis.ticks.x = element_blank(),
         panel.grid = element_blank())
 
-byCond_revOrder_RTplot <- ggplot(byCond_revOrder_noMissing,
+byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
                                  aes(x=revOrder, y=logRT_mean,
-                                     ymin = logRT_mean - logRT_mean_sem,
-                                     ymax = logRT_mean + logRT_mean_sem,
+                                     ymin = logRT_mean - sem,
+                                     ymax = logRT_mean + sem,
                                      shape = class)) +
   geom_point(size=3) +
   geom_line(size=.75) +
-  geom_errorbar(width=.15) +
+  geom_errorbar(width=.15,
+                na.rm=TRUE) +
   scale_shape_discrete(name="Practice\nCondition",
                        labels=c("Baseline","Restudy","Test Practice")) +
   scale_x_continuous("Reverse Output Position",
