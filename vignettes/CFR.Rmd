@@ -502,7 +502,6 @@ diff_byCond_revOrder_noMissing <- diff_bySubjects_cond_revOrder_noMissing %>%
             by=c("class","revOrder"))  
 ```
 
-
 ```{r pub_figures, dev='svglite'}
 byCond_acc_plot <- ggplot(diff_byCond,
                           aes(x=" ",
@@ -522,6 +521,9 @@ byCond_acc_plot <- ggplot(diff_byCond,
   theme(axis.ticks.x = element_blank(),
         panel.grid = element_blank())
 
+RT_breaks <- seq(round(min(byCond_revOrder_noMissing$logRT_mean),0),
+                 round(max(byCond_revOrder_noMissing$logRT_mean),0),
+                 by=.5)
 byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
                                  aes(x=revOrder, y=logRT_mean,
                                      ymin = logRT_mean - sem,
@@ -538,10 +540,10 @@ byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
                      labels = c("n",
                                 paste("n-", 1:(max(byCond_revOrder_noMissing$revOrder)-1),
                                       sep=''))) +
-  scale_y_continuous("Mean log IRT",
-                     breaks=seq(round(min(byCond_revOrder_noMissing$logRT_mean),0),
-                                round(max(byCond_revOrder_noMissing$logRT_mean),0),
-                                by=.5)) +
+  scale_y_continuous("I.R.T.",
+                     breaks = RT_breaks,
+                     labels = as.character(round(exp(RT_breaks),2))
+                     ) +
   theme_bw(base_size = 16) +
   theme(legend.position = c(.75, .7),
         panel.grid = element_blank())
