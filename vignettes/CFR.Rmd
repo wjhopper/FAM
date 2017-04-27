@@ -26,6 +26,7 @@ library(wesanderson)
 library(effsize)
 library(pander)
 library(rococo)
+library(broom)
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, cache=FALSE, 
                       fig.width=10, fig.height=6, fig.align='center')
 op <- options(contrasts = c("contr.sum", "contr.poly"))
@@ -415,7 +416,7 @@ pander(RT_t_contrasts)
 ```
 
 ## Output Order Correlation
-```{r gamma_correlation, fig.height=4, fig.width=5, results="asis"}
+```{r gamma_correlation}
 ranks <- corrects %>%
   select(subject, cond_list, class, resp, target) %>%
   filter(class %in% c("np","tp"),
@@ -426,7 +427,7 @@ ranks <- corrects %>%
   group_by(subject, cond_list, class) %>%  
   mutate(rank = row_number()) %>%
   group_by(subject, cond_list) %>%
-  mutate(rank = replace(rank,
+  mutate(id = replace(rank,
                         class=="tp",
                         match(resp[class=="tp"],
                               resp[class=="np"])
@@ -434,20 +435,47 @@ ranks <- corrects %>%
          ) %>%
   ungroup()
 
-gamma_correlations <- ranks %>%
+gamma_cor_bySubject_pooling_lists <- ranks %>%
   group_by(subject, cond_list) %>%
   do(bind_cols(distinct(.[c("subject","cond_list")]),
-               as_data_frame(t(rank_agreements(x = .$rank[.$class=="np"],
-                                               y = .$rank[.$class=="tp"])))
+               as_data_frame(t(rank_agreements(x = .$id[.$class=="np"],
+                                               y = .$id[.$class=="tp"])))
                ))  %>%
   group_by(subject) %>%
   summarise_at(c("concordances","discordances"), sum) %>%
   mutate(gamma = (concordances-discordances)/(concordances+discordances),
          gamma_z = atanh(gamma)) # fischer-z transformed the correlation
 
-hist(gamma_correlations$gamma, xlab="gamma")
-pander(t.test(gamma_correlations$gamma_z),
-       style="rmarkdown")
+Ncorrect_diff <- N_correct %>%
+  filter(class %in% c("np","tp")) %>%
+  spread(class,nRecalled) %>%
+  mutate(diff = tp-np) %>%
+  select(-tp, -np)
+
+gamma_cor_bySubject_List <- ranks %>%
+  group_by(subject, cond_list) %>%
+  summarise(gamma = rococo(id[class=="np"],
+                           id[class=="tp"])) %>%
+  left_join(Ncorrect_diff,
+            by = c("subject", "cond_list"))
+```
+
+```{r gamma_cor_figures, fig.height=4, fig.width=5, results="asis", fig.caption=c("A","B")}
+hist(gamma_cor_bySubject_pooling_lists$gamma,
+     xlab=expression(paste("Goodman–Kruskal ", gamma, " Coefficient")),
+     main = "Practice/Final Test Gamma Correlations\nby Subject"
+     )
+gamma_cor_t.test <- tidy(t.test(gamma_cor_bySubject_pooling_lists$gamma_z)) %>%
+  rename(`gamma~z~` = estimate, df = parameter, `*t*` = statistic) %>%
+  select(-method)
+pander(gamma_cor_t.test, style="rmarkdown", split.tables = Inf)
+
+plot_gamma_cor_bySubject_List <- ggplot(gamma_cor_bySubject_List,
+                                        aes(x=diff,y=gamma)) +
+  geom_point() +
+  xlab("Difference in Items Recalled") + 
+  ylab(expression(paste("Goodman–Kruskal ", gamma, " Coefficient")))
+print(plot_gamma_cor_bySubject_List)
 ```
 
 ## Final Figures
