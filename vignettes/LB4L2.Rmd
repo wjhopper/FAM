@@ -190,30 +190,6 @@ pander(summary(logRT_anova))
 # autoplot(joint_1, DV = "RT")
 ```
 
-```{r}
-  # transmute(subject, group,
-  #           N.S.p = N.S.p - N.N.p,
-  #           N.T.p = N.T.p - N.N.p,
-  #           S.N.p = S.N.p - N.N.p,
-  #           T.N.p = T.N.p - N.N.p,            
-  #           N.S.logRT_mean = N.S.logRT_mean - N.N.logRT_mean,
-  #           N.T.logRT_mean = N.T.logRT_mean - N.N.logRT_mean,
-  #           S.N.logRT_mean = S.N.logRT_mean - N.N.logRT_mean,
-  #           T.N.logRT_mean = T.N.logRT_mean - N.N.logRT_mean,
-  #           N.S.RT_mean = N.S.RT_mean -N.N.RT_mean,
-  #           N.T.RT_mean = N.T.RT_mean -N.N.RT_mean,
-  #           S.N.RT_mean = S.N.RT_mean -N.N.RT_mean,
-  #           T.N.RT_mean = T.N.RT_mean -N.N.RT_mean,
-  #           N.S.RT_median = N.S.RT_median - N.N.RT_median,
-  #           N.T.RT_median = N.T.RT_median - N.N.RT_median,
-  #           S.N.RT_median = S.N.RT_median - N.N.RT_median,
-  #           T.N.RT_median = T.N.RT_median - N.N.RT_median) %>%
-  # gather(key="var", value="value", -subject, -group) %>%
-  # separate(var, into = c("practice", "OCpractice", "var"),sep = "\\.") %>%
-  # spread(var,value) %>%
-  # recode_conditions()
-```
-
 ## Quantile Plots
 ```{r quantiles, fig.height=8,fig.width = 11, include=FALSE}
 
