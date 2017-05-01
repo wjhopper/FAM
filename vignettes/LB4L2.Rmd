@@ -39,7 +39,7 @@ bySubject_group_prac_OCprac <- summary(LB4L2_final, level = "subject")
 byGroup_prac_OCprac <- summary(bySubject_group_prac_OCprac)
 ```
 
-```{r difference_sem_plot, dev="svglite"}
+```{r difference_sem_plot, fig.height=6.5, fig.width = 8.5, dev="svglite"}
 diff_bySubject_group_prac_OCprac <- bySubject_group_prac_OCprac %>%
   filter(acc==1) %>%
   select(-acc, -N, -cell_max) %>%
@@ -81,7 +81,10 @@ control <- rbind(mutate(control, cue_type = "Same Cue"),
 
 theme_set(theme_bw(base_size = 16) +
           theme(plot.title = element_text(hjust = .5),
-                axis.title = element_text(size=12)))
+                panel.grid = element_blank(),
+                axis.title = element_text(size=12)
+                )
+          )
 acc <- ggplot(bind_rows(control,intervention),
               aes(x=group, y=p,
                   ymax = p + p_sem,
@@ -93,7 +96,8 @@ acc <- ggplot(bind_rows(control,intervention),
   facet_grid(cue_type ~ .) +
   scale_x_discrete("Group",
                    limits=c("immediate","delay"),
-                   labels=c("Immediate","Delay")) + 
+                   labels=c("Immediate","Delay"),
+                   expand = c(.25,0)) + 
   scale_y_continuous("Proportion Correct") +
   scale_shape_discrete(guide=FALSE) +
 
@@ -103,10 +107,13 @@ acc <- ggplot(bind_rows(control,intervention),
 
   
 RT <- acc %+%
-  aes(y = RT_mean,
-      ymin = RT_mean - RT_mean_sem,
-      ymax = RT_mean + RT_mean_sem) + 
-  scale_y_continuous("Mean R.T. (seconds)") +
+  aes(y = logRT_mean,
+      ymin = logRT_mean - logRT_mean_sem,
+      ymax = logRT_mean + logRT_mean_sem) +
+  scale_y_continuous("Log Scale RT (seconds)",
+                     breaks = c(.2, .4, .6, .8, 1),
+                     labels = as.character(round(exp(c(.2, .4, .6, .8, 1)), 2))
+                     ) +
   scale_shape_discrete("Practice",
                        labels = c("Control","Study Practice", "Test Practice")) +
   ggtitle("Reaction Time") +
