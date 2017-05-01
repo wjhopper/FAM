@@ -416,6 +416,10 @@ pander(RT_t_contrasts)
 ```
 
 ## Output Order Correlation
+The consistency between the output order of items on the practice test and final tests was measured with the Kruskal-Goodman gamma coefficient. Higher values of the gamma statistic indicate more consistent ordering of the recalled words between the two tests.
+
+This statistic was calcuated in two different ways: list-wise, and subject-wise. In the the list-wise calculation, the gamma stastic was calculated for each individual list from each participant. In the subject-wise calculation, the concordances from all four lists were summed together and discordances from  list were summed together, before being combined to form the gamma statistic.
+
 ```{r gamma_correlation}
 ranks <- corrects %>%
   select(subject, cond_list, class, resp, target) %>%
@@ -449,33 +453,77 @@ gamma_cor_bySubject_pooling_lists <- ranks %>%
 Ncorrect_diff <- N_correct %>%
   filter(class %in% c("np","tp")) %>%
   spread(class,nRecalled) %>%
-  mutate(diff = tp-np) %>%
+  mutate(N_diff = tp-np) %>%
   select(-tp, -np)
+
+RT_delta_bySubject_List <- corrects %>%
+  filter(class %in% c("np","tp")) %>%
+  group_by(subject, class, cond_list) %>%
+  summaryFun() %>% 
+  select(subject, class, cond_list, RT_median, RT_mean, logRT_mean) %>%
+  gather(key = "DV", value="val", RT_median, RT_mean, logRT_mean) %>%
+  spread(class, val) %>%
+  mutate(diff = tp - np) %>% # Final Minus Practice. Negative means faster on final test.
+  select(-tp, -np) %>%
+  mutate(DV = paste0(DV, "_diff")) %>%
+  spread(DV, diff)
 
 gamma_cor_bySubject_List <- ranks %>%
   group_by(subject, cond_list) %>%
   summarise(gamma = rococo(id[class=="np"],
-                           id[class=="tp"])) %>%
-  left_join(Ncorrect_diff,
-            by = c("subject", "cond_list"))
+                           id[class=="tp"]))
+gamma_cor_bySubject_List <- Reduce(function(x,y) left_join(x, y, by = c("subject", "cond_list")),
+                                   list(gamma_cor_bySubject_List,
+                                        Ncorrect_diff,
+                                        RT_delta_bySubject_List)
+                                   )
 ```
 
-```{r gamma_cor_figures, fig.height=4, fig.width=5, results="asis", fig.caption=c("A","B")}
+```{r gamma_cor_test, fig.height=5, fig.width=5, results="asis"}
 hist(gamma_cor_bySubject_pooling_lists$gamma,
      xlab=expression(paste("Goodman–Kruskal ", gamma, " Coefficient")),
      main = "Practice/Final Test Gamma Correlations\nby Subject"
      )
+
 gamma_cor_t.test <- tidy(t.test(gamma_cor_bySubject_pooling_lists$gamma_z)) %>%
   rename(`gamma~z~` = estimate, df = parameter, `*t*` = statistic) %>%
   select(-method)
-pander(gamma_cor_t.test, style="rmarkdown", split.tables = Inf)
+pander(gamma_cor_t.test, style="rmarkdown", split.tables = Inf,
+       caption = "Gamma Correlation t-test")
 
-plot_gamma_cor_bySubject_List <- ggplot(gamma_cor_bySubject_List,
-                                        aes(x=diff,y=gamma)) +
+lm_gamma_by_logRT_mean_diff <- lm(gamma ~ logRT_mean_diff,
+                                  data = gamma_cor_bySubject_List)
+s_lm_gamma_by_logRT_mean_diff <- summary(lm_gamma_by_logRT_mean_diff)
+pander(s_lm_gamma_by_logRT_mean_diff)
+```
+
+```{r gamma_cor_figs, fig.height=5, fig.width=8, results="asis"}
+plot_gamma_vs_list_diff <- ggplot(gamma_cor_bySubject_List,
+                                  aes(x=N_diff, y=gamma)) +
   geom_point() +
-  xlab("Difference in Items Recalled") + 
-  ylab(expression(paste("Goodman–Kruskal ", gamma, " Coefficient")))
-print(plot_gamma_cor_bySubject_List)
+  xlab("Difference in Items Recalled\n(Final - Practice)") + 
+  ylab(expression(paste("Goodman–Kruskal "," ", gamma, " Coefficient")))
+
+x_axis_RT_breaks <- seq(round(min(gamma_cor_bySubject_List$logRT_mean_diff),0),
+                        round(max(gamma_cor_bySubject_List$logRT_mean_diff),0),
+                        by=.5)
+
+plot_gamma_vs_logRT_diff <- plot_gamma_vs_list_diff %+%
+  aes(x=logRT_mean_diff) +
+  scale_x_continuous("Log IRT Difference\n(Final - Practice)",
+                     breaks = x_axis_RT_breaks) +
+  geom_smooth(se=FALSE, method = "lm", color = "black") + 
+  annotate("text", x = 1, y = .75, 
+           label = paste("italic(r) ==", 
+                         sub("^(-?)0.", "\\1.", round(sqrt(s_lm_gamma_by_logRT_mean_diff$r.squared),3))
+                         ),
+           parse=TRUE
+           )
+
+grid.draw(arrangeGrob(plot_gamma_vs_list_diff, plot_gamma_vs_logRT_diff,
+                      nrow=1, ncol=2)
+          )
+
 ```
 
 ## Final Figures
@@ -493,7 +541,7 @@ bySubjects_cond_revOrder_noMissing <- filter(bySubjects_cond_revOrder,
 
 ```
 
-```{r}
+```{r differnce_datasets}
 diff_bySubjects_cond <- bySubjects_cond %>%
   select(subject, class, acc_mean) %>%
   spread(class, acc_mean) %>%
@@ -527,10 +575,14 @@ diff_byCond_revOrder_noMissing <- diff_bySubjects_cond_revOrder_noMissing %>%
                    sem=NA)
         ) %>%
   left_join(select(byCond_revOrder_noMissing, class, revOrder, logRT_mean),
-            by=c("class","revOrder"))  
+            by=c("class","revOrder"))
 ```
 
 ```{r pub_figures, dev='svglite'}
+theme_set(theme_bw(base_size = 16) +
+          theme(panel.grid = element_blank())
+          )
+
 byCond_acc_plot <- ggplot(diff_byCond,
                           aes(x=" ",
                               y=acc_mean,
@@ -545,9 +597,7 @@ byCond_acc_plot <- ggplot(diff_byCond,
   scale_shape_discrete(guide=FALSE) +
   scale_x_discrete(" ") +
   scale_y_continuous("Proportion Correct") +
-  theme_bw(base_size = 16) +
-  theme(axis.ticks.x = element_blank(),
-        panel.grid = element_blank())
+  theme(axis.ticks.x = element_blank())
 
 RT_breaks <- seq(round(min(byCond_revOrder_noMissing$logRT_mean),0),
                  round(max(byCond_revOrder_noMissing$logRT_mean),0),
@@ -567,22 +617,31 @@ byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
                      breaks=1:max(byCond_revOrder_noMissing$revOrder),
                      labels = c("n",
                                 paste("n-", 1:(max(byCond_revOrder_noMissing$revOrder)-1),
-                                      sep=''))) +
-  scale_y_continuous("I.R.T.",
+                                      sep=''))
+                     ) +
+  scale_y_continuous("Log Scale IRT (seconds)",
                      breaks = RT_breaks,
                      labels = as.character(round(exp(RT_breaks),2))
                      ) +
-  theme_bw(base_size = 16) +
-  theme(legend.position = c(.75, .7),
-        panel.grid = element_blank())
+  theme(legend.position = c(.75, .7))
 
-g <- arrangeGrob(byCond_acc_plot, byCond_revOrder_RTplot,
+g1 <- arrangeGrob(byCond_acc_plot, byCond_revOrder_RTplot,
                  nrow=1, ncol=2, widths=c(.25, 1))
-grid.draw(g)
+grid.draw(g1)
+```
+
+```{r pub_figures2}
+plot_gamma_vs_logRT_diff <- plot_gamma_vs_logRT_diff + ylab("")
+
+g2 <- arrangeGrob(plot_gamma_vs_list_diff,
+                  plot_gamma_vs_logRT_diff,
+                  nrow=1, ncol=2, widths=c(.48, .52)
+                  )
+grid.draw(g2)
 ```
 
 ### RT ~ Reverse-Order x Condition ANOVA
-```{r pub_analysis}
+```{r revOrder_by_condition_analysis}
 revOrder_RTanova <- aov(logRT_mean ~ class*revOrder + Error(subject/(class*revOrder)),
                         data = bySubjects_cond_revOrder_noMissing %>%
                                mutate_at(c("subject","class", "revOrder"),

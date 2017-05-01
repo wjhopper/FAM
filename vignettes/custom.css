@@ -2,7 +2,6 @@
   position: fixed;
   left: 0;
   top: 0;
-  padding: 60px 10px 0 0;
   width: 12.5%;
   height: 100%;
   overflow: auto;
@@ -13,7 +12,7 @@
 }
 
 #TOC ul {
-  padding-left: 20px;
+  padding: 60px 10px 0 20px;
 }
 
 body .main-container {
@@ -57,9 +56,11 @@ tr:nth-child(even) {
     background-color: #eee;
 }
 
-p {
-  padding-left: 50px;
-  font-size: 1.5em;
+body .main-container p {
+    max-width: 75%;
+    margin: 20px auto;
+    line-height: 1.4;
+    font-size: 1.25em;
 }
 
 table {
@@ -70,5 +71,3 @@ table {
   margin: 0 auto 20px;
   max-width: 60%;
 }
-
-
