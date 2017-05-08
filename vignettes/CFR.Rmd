@@ -526,6 +526,27 @@ grid.draw(arrangeGrob(plot_gamma_vs_list_diff, plot_gamma_vs_logRT_diff,
 
 ```
 
+## State-Trace Plots
+```{r state_trace}
+state_trace_plot <- ggplot(byCond,
+                           aes(x=acc_mean, y=logRT_mean, shape=class)) +
+  geom_point(size=2) +
+  geom_errorbar(aes(ymin=logRT_mean_CI_upper,
+                    ymax=logRT_mean_CI_lower),
+                width=.05) +
+  geom_errorbarh(aes(xmin=acc_mean_CI_upper,
+                     xmax=acc_mean_CI_lower),
+                 height=.05) +
+  scale_x_continuous("Accuracy", limits=c(.5,1)) + 
+  scale_y_continuous("Log Scale RT (seconds)",
+                     breaks = seq(.3, .6, by=.1),
+                     labels = as.character(round(exp(seq(.3, .6, by=.1)), 2))) +
+  scale_shape_discrete("Practice\nCondition",
+                       labels = c("Baseline", "Restudy", "Test"))
+
+state_trace_plot
+```
+
 ## Final Figures
 ```{r equal_n_dataset}
 max_complete <- byCond_revOrder %>%

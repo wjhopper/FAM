@@ -186,6 +186,29 @@ logRT_anova_OC_only <- aov(model,
 pander(summary(logRT_anova_OC_only), caption="Other-Cue Only log RT")
 ```
 
+## State-Trace Plots
+```{r state_trace}
+SC_immediate <- filter(byGroup_prac_OCprac,
+                       group == "immediate",
+                       OCpractice == "N")
+
+state_trace_plot <- ggplot(SC_immediate,
+                           aes(x=p, y=logRT_mean, shape=practice)) +
+  geom_point(size=2) +
+  geom_errorbar(aes(ymax=logRT_mean_CI_upper,
+                    ymin=logRT_mean_CI_lower),
+                width=.025) +
+  geom_errorbarh(aes(xmax=p_CI_upper,
+                     xmin=p_CI_lower),
+                 height=.025) +
+  scale_shape_discrete("Practice\nCondition",
+                       labels = c("Baseline", "Restudy", "Test")) +
+  scale_x_continuous("Accuracy", limits = c(.5, 1)) + 
+  scale_y_continuous("Log Scale RT (seconds)",
+                     labels = as.character(round(exp(seq(.2, .7, by=.1)), 2)))
+state_trace_plot
+```
+
 ## Conditional Accuracy and RT
 ```{r conditionals}
 # CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1, conditional = TRUE)
