@@ -155,7 +155,7 @@ model <- . ~ group * condition + Error(subject/condition)
 model[[2]] <- quote(p)
 acc_anova <- aov(p ~ group * condition + Error(subject/condition),
                  data = anova_data)
-pander(summary(acc_anova))
+pander(summary(acc_anova), caption="Accuracy")
 
 model[[2]] <- quote(RT_median)
 RT_median_anova <- aov(model,
@@ -164,16 +164,26 @@ RT_median_anova <- aov(model,
                        filter(!missing) %>%
                        inner_join(anova_data, by="subject")
                 )
-pander(summary(RT_median_anova))
+pander(summary(RT_median_anova), caption="median RT")
 
 model[[2]] <- quote(logRT_mean)
 logRT_anova <- aov(model,
-                data = group_by(anova_data, subject) %>%
-                       summarise(missing = anyNA(logRT_mean)) %>%
-                       filter(!missing) %>%
-                       inner_join(anova_data, by="subject")
-                )
-pander(summary(logRT_anova))
+                   data = group_by(anova_data, subject) %>%
+                    summarise(missing = anyNA(logRT_mean)) %>%
+                    filter(!missing) %>%
+                    inner_join(anova_data, by = "subject")
+                   )
+pander(summary(logRT_anova), caption="log RT")
+
+logRT_anova_OC_only <- aov(model,
+                           data = group_by(anova_data, subject) %>%
+                             summarise(missing = anyNA(logRT_mean)) %>%
+                             filter(!missing) %>%
+                             inner_join(anova_data, by = "subject") %>%
+                             ungroup() %>%
+                             filter((practice=="N" & OCpractice=="N") | OCpractice %in% c("S","T"))
+                           )
+pander(summary(logRT_anova_OC_only), caption="Other-Cue Only log RT")
 ```
 
 ## Conditional Accuracy and RT
