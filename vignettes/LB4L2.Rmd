@@ -206,7 +206,8 @@ state_trace_plot <- ggplot(SC_immediate,
   scale_x_continuous("Accuracy", limits = c(.5, 1)) + 
   scale_y_continuous("Log Scale RT (seconds)",
                      labels = as.character(round(exp(seq(.2, .7, by=.1)), 2)))
-state_trace_plot
+
+print(state_trace_plot)
 ```
 
 ## Conditional Accuracy and RT

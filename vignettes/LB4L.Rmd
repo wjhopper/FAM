@@ -83,7 +83,7 @@ print(sub_means_plot)
 
 IVsummary <- heirarchicalSummary(collapse = c("subject","group"),
                             hold =c("practice","other_type"),
-                            rawData = cbind(filter(LB4L_allSs,list !=1) ,n=1),
+                            rawData = mutate(filter(LB4L_allSs,list !=1) ,n=1),
                             w_prac_score = weighted.mean(prac_score,w=n),                            
                             prac_score = mean(prac_score,na.rm=TRUE),
                             w_final_sd = sqrt(wtd.var(final_score)),
@@ -195,7 +195,7 @@ condAvergedPlot <- ggplot(filter(condSummary$groups,merged_prac_score %in% 0:1),
                           aes(x=other_type, y= final_acc,
                               fill=merged_prac_score,ymax=1)) +
   geom_bar(position='dodge',stat="identity") +
-  facet_grid(. ~ group, labeller=function(...) { return(c("Immediate","Delayed"))}) +
+  facet_grid(. ~ group, labeller=as_labeller(c(`1`="Immediate", `2`="Delayed"))) +
   geom_errorbar(aes(ymax =upper, ymin=lower),
                 position=position_dodge(width=.9), width=0.2) +
   # label n observations in each cell

@@ -544,7 +544,7 @@ state_trace_plot <- ggplot(byCond,
   scale_shape_discrete("Practice\nCondition",
                        labels = c("Baseline", "Restudy", "Test"))
 
-state_trace_plot
+print(state_trace_plot)
 ```
 
 ## Final Figures

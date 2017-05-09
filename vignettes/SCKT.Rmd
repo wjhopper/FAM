@@ -128,7 +128,7 @@ pander(summary(aov.1),justify='left',table.split.table=Inf)
 ```
 
 ## Conditional Analysis
-```{r conditional, fig.width= 9}
+```{r conditional, fig.width= 9, eval=FALSE}
 # SCKT_allSs$prac_score <- factor(SCKT_allSs$prac_score)
 
 # selected only tested cue/targets pairs
@@ -153,7 +153,7 @@ condPlot
 ```
 
 
-```{r joint}
+```{r joint, eval=FALSE}
 jointData <- SCKT_jointSummary(SCKT_allSs)
 
 ```
