@@ -22,7 +22,8 @@ Suggests:
     pander,
     wesandersen,
     testthat,
-    svglite
+    svglite,
+    afex
 License: CC0
 LazyData: true
 VignetteBuilder: knitr
