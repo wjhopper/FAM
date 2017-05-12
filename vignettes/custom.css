@@ -71,3 +71,8 @@ table {
   margin: 0 auto 20px;
   max-width: 60%;
 }
+
+body .main-container img {
+    max-width: none;
+    height: auto;
+}
