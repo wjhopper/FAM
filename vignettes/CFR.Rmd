@@ -692,14 +692,19 @@ byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
                                  aes(x=revOrder, y=logRT_mean,
                                      ymin = logRT_mean - sem,
                                      ymax = logRT_mean + sem,
-                                     shape = class)) +
+                                     shape = class,
+                                     linetype = class)) +
   geom_point(size=3) +
   geom_line(size=.75) +
   geom_errorbar(width=.15,
-                na.rm=TRUE) +
+                na.rm=TRUE,
+                linetype=1) +
   scale_shape_discrete(name="Practice\nCondition",
                        labels=c("Baseline","Restudy","Test Practice")) +
-  scale_x_continuous("Reverse Output Position",
+  scale_linetype_manual(name="Practice\nCondition",
+                        labels=c("Baseline","Restudy","Test Practice"),
+                        values= c("solid","dotted","dashed")) +
+  scale_x_reverse("Output Position",
                      breaks=1:max(byCond_revOrder_noMissing$revOrder),
                      labels = c("n",
                                 paste("n-", 1:(max(byCond_revOrder_noMissing$revOrder)-1),
@@ -709,7 +714,8 @@ byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
                      breaks = RT_breaks,
                      labels = as.character(round(exp(RT_breaks),2))
                      ) +
-  theme(legend.position = c(.75, .7))
+  theme(legend.position = c(.25, .7),
+        legend.key.width = unit(2.75, "lines"))
 
 g1 <- arrangeGrob(byCond_acc_plot, byCond_revOrder_RTplot,
                  nrow=1, ncol=2, widths=c(.25, 1))

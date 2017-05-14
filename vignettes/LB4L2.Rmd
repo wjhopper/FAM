@@ -89,10 +89,12 @@ acc <- ggplot(bind_rows(control,intervention),
               aes(x=group, y=p,
                   ymax = p + p_sem,
                   ymin = p - p_sem,
-                  shape = practice, group=practice)) +
+                  shape = practice,
+                  group = practice,
+                  linetype = practice)) +
   geom_point(size = 2) +
-  geom_line() +
-  geom_errorbar(width=.15, na.rm=TRUE) +
+  geom_line(size=.8) +
+  geom_errorbar(width=.1, na.rm=TRUE, linetype=1) +
   facet_grid(cue_type ~ .) +
   scale_x_discrete("Group",
                    limits=c("immediate","delay"),
@@ -100,7 +102,8 @@ acc <- ggplot(bind_rows(control,intervention),
                    expand = c(.25,0)) + 
   scale_y_continuous("Proportion Correct") +
   scale_shape_discrete(guide=FALSE) +
-
+  scale_linetype_manual(guide=FALSE,
+                        values= c("solid","dotted","dashed")) +
   ggtitle("Accuracy") + 
   theme(strip.text.y = element_blank(),
         strip.background = element_blank())
@@ -114,19 +117,24 @@ RT <- acc %+%
                      breaks = c(.2, .4, .6, .8, 1),
                      labels = as.character(round(exp(c(.2, .4, .6, .8, 1)), 2))
                      ) +
-  scale_shape_discrete("Practice",
-                       labels = c("Control","Study Practice", "Test Practice")) +
+  scale_linetype_manual(name="Practice\nCondition",
+                        labels=c("Baseline","Restudy","Test Practice"),
+                        values= c("solid","dotted","dashed")) +  
+  scale_shape_discrete(name="Practice\nCondition",
+                       labels = c("Baseline","Restudy", "Test Practice")) +
+
   ggtitle("Reaction Time") +
   theme(strip.text.y = element_text(angle=0,
                                     size = 18,
                                     margin = margin(l=8)),
+         legend.key.width = unit(2.6, "lines"),
         strip.background = element_blank(),
         legend.margin = margin(l=-90))
 
 g <- arrangeGrob(acc, RT,
                  nrow = 1,
                  ncol = 2,
-                 widths = c(.4, .6))
+                 widths = c(.37, .63))
 grid.draw(g)
 
 # CD <- summary(LB4L2_final, level = "group", given_practice = TRUE, conditional = TRUE) 
