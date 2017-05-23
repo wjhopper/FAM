@@ -48,7 +48,7 @@ study_data <- data.frame(do.call(rbind,
   select(subject = sub_num, list,practice,target,abs_order = study_order,
          final_order, onset=study_onset, FP, LP, resp, score, phase, class)
 
-rawData <- rbind(study_data, prac_data,final_data)
+rawData <- bind_rows(study_data, prac_data,final_data)
 rawData$subject[rawData$subject==55] <- 20
 rawData$score <- NA_real_
 rawData <- arrange(rawData, subject) %>%
@@ -76,19 +76,51 @@ rawData <- arrange(rawData, subject) %>%
          } else {
            NA_real_
          })
-CFRcleaned <- filter(rawData,any(score == 2)) %>%
-  select(subject,target,resp, score, where) %>%
-  mutate(target = target[where]) %>%
-  filter(score %in% 2) %>%
-  edit()
+
+is_fuzzy_match <- rawData$score %in% 2
+
+if (file.exists("data-raw/CFRcleaned.Rdata")) {
+  load(file="data-raw/CFRcleaned.Rdata")
+  cleaned_items = nrow(CFRcleaned)
+} else {
+  cleaned_items = NA
+}
+
+if (is.na(cleaned_items) || cleaned_items != sum(is_fuzzy_match)) {
+  CFRcleaned <- filter(rawData,any(score == 2)) %>%
+    select(subject,target,resp, score, where) %>%
+    mutate(target = target[where]) %>%
+    filter(score %in% 2) %>%
+    edit()
+
+  valid_answer <- FALSE
+  while (!valid_answer) {
+    answer <- pmatch(tolower(readline("Save as CFRcleaned.Rdata (yes/no)? ")),
+                     c("yes", "no"),
+                     nomatch = 0
+                     )
+    if (answer == 1) {
+      save(CFRcleaned, file = "data-raw/CFRcleaned.Rdata")
+    }
+
+    if (answer %in% c(1, 2)) {
+      valid_answer <- TRUE
+    }
+
+  }
+
+}
 # Note: I know from visual inspection that 'tale' (row 24) is correct
 #   it matches 'tail' not cottage, set it to 1
 # Note: I know from visual inspection that "flooe" (row 45) is a duplicate
 #   of "floor" in the same list", set it to 0
 # Note: I know from visual inspection that "canon" (row 73) is a duplicate
 #   of "cannon" in the same list", set it to 0
-# Note: I know "staek" in the rawData data frme (row 1358) is a correct
+# Note: I know "staek" in the rawData data frame (row 1358) is a correct
 #   answer, dunno how it got missed in fuzzy matching
+
+
+rawData <- arrange(ungroup(rawData), subject, desc(phase), list)
 rawData$score[rawData$resp %in% 'staek']<-1
 # Replace the fuzzy matches with the manual decisions
 rawData$score[rawData$score %in% 2] <- CFRcleaned$score
@@ -103,8 +135,9 @@ rawData <- rawData %>%
          },
          intrusions  = as.numeric(score==0 & repeats ==0 & resp != '')) %>%
   group_by(subject,phase,practice) %>%
-  mutate(cond_list =  rep(1:length(unique(list)),as.vector(table(list))))
+  mutate(cond_list =  rep(1:length(unique(list)),as.vector(table(list)))) %>%
+  arrange(subject, phase, list)
 
-#CFR_allSs <- rawData
+# CFR_allSs <- rawData
 # save(CFR_allSs, file="data/CFR_allSs.rda")
 
