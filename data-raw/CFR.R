@@ -26,19 +26,23 @@ final_data <- data.frame(do.call(rbind,
                                         col.names=columnNames)),
                          phase="final") %>%
   group_by(subject,list) %>%
-  mutate(class = encodeClass(practice))
+  mutate(class = encodeClass(practice)) %>%
+  ungroup() %>%
+  select(-final_order) %>%
+  mutate(subject = replace(subject, subject==55, 20))
 
 # Create data frame of Practice Phase Data
 prac_data <- data.frame(do.call(rbind,
                                 lapply(practice_flist, read.csv, header=T, sep=',',
                                        col.names=columnNames)),
                         phase= "prac",
-                        class= 'np')
+                        class= 'np') %>%
+  select(-final_order) %>%
+  mutate(subject = replace(subject, subject==55, 20))
 
 # Create study phase data frame
 study_data <- data.frame(do.call(rbind,
                                 lapply(study_flist, read.csv, header=T, sep=',')),
-                         final_order=NA,
                          FP = NA,
                          LP=NA,
                          resp = NA,
@@ -46,23 +50,40 @@ study_data <- data.frame(do.call(rbind,
                          phase= "study",
                          class = 'np') %>%
   select(subject = sub_num, list,practice,target,abs_order = study_order,
-         final_order, onset=study_onset, FP, LP, resp, score, phase, class)
+         onset=study_onset, FP, LP, resp, score, phase, class) %>%
+  mutate(subject = replace(subject, subject==55, 20))
 
-rawData <- bind_rows(study_data, prac_data,final_data)
-rawData$subject[rawData$subject==55] <- 20
-rawData$score <- NA_real_
-rawData <- arrange(rawData, subject) %>%
-  group_by(subject,list,phase) %>%
-  mutate(practice = practice[1],
-         order = 1:n()) %>%
-  ungroup() %>%
-  mutate(onset = replace(onset, !is.finite(onset) | onset ==0, NA),
-         FP = replace(FP, !is.finite(FP) | FP ==0, NA),
-         LP = replace(LP, !is.finite(LP) | LP ==0, NA),
+test_data <- bind_rows(filter(prac_data, practice != 'S', list != 0),
+                       filter(final_data, list != 0)
+                       )%>%
+  arrange(subject, list, phase) %>%
+  mutate(score = NA_real_,
+         onset = replace(onset, onset == 0, NA_real_),
+         FP = replace(FP, !is.finite(FP) | FP == 0, NA),
+         LP = replace(LP, !is.finite(LP) | LP == 0, NA),
+         resp = replace(resp, resp=="", NA_character_),
          resp_dur = LP-FP) %>%
-  group_by(subject,list,phase) %>%
-  arrange(FP) %>%
-  mutate(RT = c(FP[1]-onset[1],diff(FP)-resp_dur[1:n()-1]),
+  group_by(subject, list, phase) %>%
+  mutate(practice = replace(practice, practice == "", practice[1])) %>%
+  ungroup()
+
+target_stimuli <- select(.data = test_data,
+                         subject, list, class, practice, phase, target) %>%
+  group_by(subject, list, phase) %>%
+  mutate(order = 1:n()) %>%
+  ungroup()
+
+test_responses <- filter(.data = test_data, !is.na(resp)) %>%
+  select(-target, -abs_order) %>%
+  group_by(subject, list, phase) %>%
+  mutate(order = 1:n()) %>%
+  ungroup()
+
+test_data <- full_join(target_stimuli, test_responses,
+                       by = c("subject", "list", "practice", "class", "phase", "order")
+                       ) %>%
+  group_by(subject, list, phase) %>%
+  mutate(RT = c(FP[1]-onset[1], diff(FP)-resp_dur[1:n()-1]),
          CRT = cumsum(RT),
          score = if (phase[1]=='final'| (phase[1]=='prac' & practice[1]=='T')) {
                    whoppeR::score(target,resp,checkDuplicates = TRUE,
@@ -75,22 +96,26 @@ rawData <- arrange(rawData, subject) %>%
                  ignoreVals=NA,index.return = TRUE)$position
          } else {
            NA_real_
-         })
-
-is_fuzzy_match <- rawData$score %in% 2
+         }) %>%
+  ungroup() %>%
+  arrange(subject, list, desc(phase), order)
 
 if (file.exists("data-raw/CFRcleaned.Rdata")) {
   load(file="data-raw/CFRcleaned.Rdata")
+  CFRcleaned <- filter(CFRcleaned, list != 0)
   cleaned_items = nrow(CFRcleaned)
 } else {
   cleaned_items = NA
 }
 
+is_fuzzy_match <- test_data$score %in% 2
+
 if (is.na(cleaned_items) || cleaned_items != sum(is_fuzzy_match)) {
-  CFRcleaned <- filter(rawData,any(score == 2)) %>%
-    select(subject,target,resp, score, where) %>%
+  CFRcleaned <- filter(test_data3, any(score == 2)) %>%
+    select(subject,list, phase, target, resp, score, where) %>%
     mutate(target = target[where]) %>%
     filter(score %in% 2) %>%
+    arrange(subject, list, phase) %>%
     edit()
 
   valid_answer <- FALSE
@@ -111,33 +136,52 @@ if (is.na(cleaned_items) || cleaned_items != sum(is_fuzzy_match)) {
 
 }
 # Note: I know from visual inspection that 'tale' (row 24) is correct
-#   it matches 'tail' not cottage, set it to 1
+#   it matches 'tail' not cottage, set it to 1, and its position to 1
 # Note: I know from visual inspection that "flooe" (row 45) is a duplicate
 #   of "floor" in the same list", set it to 0
 # Note: I know from visual inspection that "canon" (row 73) is a duplicate
 #   of "cannon" in the same list", set it to 0
-# Note: I know "staek" in the rawData data frame (row 1358) is a correct
+# Note: I know "staek" in the test_data data frame (row 1358) is a correct
 #   answer, dunno how it got missed in fuzzy matching
+# Note: I know from visual inspection that "bridge" (row 82) should not
+# be considered a match to "ridge", as ridge is recalled later.
 
+test_data$score[test_data$resp %in% 'staek']<-1
+test_data$score[test_data$resp %in% 'flooe' &
+                  test_data$subject == 13 &
+                  test_data$order == 13 &
+                  test_data$list == 3 &
+                  test_data$phase == "final"] <- 2
 
-rawData <- arrange(ungroup(rawData), subject, desc(phase), list)
-rawData$score[rawData$resp %in% 'staek']<-1
 # Replace the fuzzy matches with the manual decisions
-rawData$score[rawData$score %in% 2] <- CFRcleaned$score
-rawData$final_order <- NULL # useless column, redundant with order column
-
-rawData <- rawData %>%
-  group_by(subject,list,phase) %>%
-  mutate(repeats = if (phase[1]=='study'| (phase[1]=='prac' & practice[1]=='S')) {
-           return(NA_real_)
-         } else {
-           as.numeric(duplicated(resp,incomparables = c(NA_character_,'')))
-         },
-         intrusions  = as.numeric(score==0 & repeats ==0 & resp != '')) %>%
-  group_by(subject,phase,practice) %>%
+test_data[is_fuzzy_match, c("score", "where")] <- NA
+test_data <- left_join(test_data,
+                       select(CFRcleaned, -target),
+                       by = c("subject", "list", "phase", "resp")) %>%
+  mutate(score = coalesce(score.x, score.y),
+         where = coalesce(where.x, where.y)) %>%
+  # filter(subject == 13, list == 3, phase=="final") %>%
+  group_by(subject, list, phase) %>%
+  mutate(resp = replace(resp,
+                        is.na(score.x) & score == 1,
+                        target[where[is.na(score.x) & score == 1]])
+         ) %>%
+  select(-ends_with(".y"), -ends_with(".x")) %>%
+  mutate(repeats = as.numeric(duplicated(resp,incomparables = c(NA_character_,''))),
+         score = replace(score, repeats == 1, 0),
+         where = replace(where, score == 0, NA),
+         intrusions  = as.numeric(score==0 & repeats ==0 & resp != ''),
+         target = replace(target, target == "", NA_character_)) %>%
+  group_by(subject,phase, practice) %>%
   mutate(cond_list =  rep(1:length(unique(list)),as.vector(table(list)))) %>%
-  arrange(subject, phase, list)
+  ungroup() %>%
+  arrange(subject, list, desc(phase))
 
-# CFR_allSs <- rawData
-# save(CFR_allSs, file="data/CFR_allSs.rda")
+duplicate_test <- group_by(test_data, subject, class, cond_list) %>%
+  mutate(dup = duplicated(where, incomparables = NA_real_)) %>%
+  filter(where %in% where[dup]) %>%
+  arrange(subject, list, phase, where)
+
+# CFR <- test_data
+# save(CFR, file="data/CFR.rda")
 

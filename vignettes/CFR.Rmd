@@ -41,11 +41,11 @@ class_labels <- c(np="Practice Test", sp="Study Practice", tp="Test Practice")
 minimal_variables <- c("subject","cond_list","class","resp","order",
                        "score", "RT")
 
-tested <- filter(ungroup(CFR_allSs),
-                 list != 0,
-                 (score %in% 1 | intrusions %in% 1 | repeats %in% 1),
-                 phase=='final' | (phase=='prac' & practice =='T'))
+data(CFR, package = "FAM")
+
+tested <- filter(CFR, !is.na(resp))
 tested$score <- as.integer(tested$score)
+
 corrects <- filter(tested, score==1) %>%
   select_(.dots = c(minimal_variables[!(minimal_variables == "order")],
                     "target","resp","where")) %>%
