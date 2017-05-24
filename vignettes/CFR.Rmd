@@ -502,7 +502,7 @@ print(state_trace_plot)
 
 ## Grand Averages
 ```{r averages, results="markdown"}
-pander(byCond[c("class", "acc_mean", "RT_mean")],
+pander(as.data.frame(byCond[c("class", "acc_mean", "RT_mean")]),
        style="rmarkdown")
 ```
 
