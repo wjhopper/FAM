@@ -188,6 +188,59 @@ bySubjects_cond_revOrder_noMissing <- filter(bySubjects_cond_revOrder,
 
 ```
 
+```{r conditional}
+targets <- filter(.data = CFR,
+                  !is.na(target),
+                  class != "sp") %>%
+  select(subject, class, cond_list, target, order) %>%
+  rename(serial_pos = order)
+
+conditional_raw <- left_join(targets,
+                             select(corrects,-target),
+                             by = c("subject", "cond_list", "class", "serial_pos" = "where")
+                             ) %>%
+  mutate(score = replace(score, is.na(score), 0)) %>%
+  select(subject, class, target, score, RT, logRT) %>%
+  gather(key = DV, value = value, score, RT, logRT) %>%
+  unite(col = DV, sep = "_", class, DV) %>%
+  spread(key = DV, value = value)
+
+conditional_means_bySubject <- conditional_raw %>%
+  group_by(subject, np_score) %>%
+  summarise(acc_mean = mean(tp_score),
+            acc_n = n(),
+            RT_mean = mean(tp_RT, na.rm=TRUE),
+            logRT_mean = mean(tp_logRT, na.rm=TRUE),
+            RT_n = sum(!is.na(tp_RT))
+            ) %>%
+  tidyr::complete(subject, np_score)
+
+conditional_means <- conditional_means_bySubject %>%
+  group_by(np_score) %>%
+  summarise(acc_n = n(),
+            acc_mean_sem = whoppeR::sem(acc_mean),
+            acc_CI_width = acc_mean_sem * qt(.975, acc_n - 1),
+            acc_mean = mean(acc_mean),
+            RT_n = sum(!is.na(RT_mean)),
+            RT_mean_sem =  whoppeR::sem(RT_mean, na.rm = TRUE),
+            RT_CI_width = RT_mean_sem * qt(.975, RT_n - 1),
+            RT_mean = mean(RT_mean, na.rm = TRUE),
+            logRT_mean_sem =  whoppeR::sem(logRT_mean, na.rm = TRUE),
+            logRT_CI_width = logRT_mean_sem * qt(.975, RT_n - 1),
+            logRT_mean = mean(logRT_mean, na.rm = TRUE)
+            ) %>%
+  mutate(acc_mean_CI_upper = acc_mean + acc_CI_width,
+         acc_mean_CI_lower = acc_mean - acc_CI_width,
+         RT_mean_CI_upper = RT_mean + RT_CI_width,
+         RT_mean_CI_lower = RT_mean - RT_CI_width,
+         logRT_mean_CI_upper = logRT_mean + logRT_CI_width,
+         logRT_mean_CI_lower = logRT_mean - logRT_CI_width) %>%
+  select(np_score, acc_mean, acc_n, acc_mean_sem, acc_mean_CI_upper, acc_mean_CI_lower,
+         RT_mean, RT_n, RT_mean_sem, RT_mean_CI_upper, RT_mean_CI_lower,
+         logRT_mean, logRT_mean_sem, logRT_mean_CI_upper, logRT_mean_CI_lower
+         )
+```
+
 ## Subject Performance 
 Left figure shows counts of correct recalls, repeats of correct recalls, and extra
 list intrusions for each list by each type of list (study practice, test practice, no practice). Perfect performance is 15/15 correct. 
@@ -481,7 +534,14 @@ grid.draw(arrangeGrob(plot_gamma_vs_list_diff, plot_gamma_vs_logRT_diff,
 
 ## State-Trace Plots
 ```{r state_trace}
-state_trace_plot <- ggplot(byCond,
+state_trace_data <- bind_rows(filter(byCond, class != "tp") %>% 
+                                select(-contains("median"), -contains("recentered")),
+                              mutate(conditional_means,
+                                     np_score = recode(np_score, `0`="tp_inc", `1`="tp_cor")
+                                     ) %>%
+                              rename(class = np_score)
+                              )
+state_trace_plot <- ggplot(state_trace_data,
                            aes(x=acc_mean, y=logRT_mean, shape=class)) +
   geom_point(size=2) +
   geom_errorbar(aes(ymin=logRT_mean_CI_upper,
@@ -490,12 +550,14 @@ state_trace_plot <- ggplot(byCond,
   geom_errorbarh(aes(xmin=acc_mean_CI_upper,
                      xmax=acc_mean_CI_lower),
                  height=.05) +
-  scale_x_continuous("Accuracy", limits=c(.5,1)) + 
+  scale_x_continuous("Accuracy", limits=c(0,1)) + 
   scale_y_continuous("Log Scale RT (seconds)",
-                     breaks = seq(.3, .6, by=.1),
-                     labels = as.character(round(exp(seq(.3, .6, by=.1)), 2))) +
-  scale_shape_discrete("Practice\nCondition",
-                       labels = c("Baseline", "Restudy", "Test"))
+                     breaks = seq(.5, 2, by=.5),
+                     labels = as.character(round(exp(seq(.5, 2, by=.5)), 2))) +
+  scale_shape_manual("Practice\nCondition",
+                     labels = c("Baseline", "Restudy", "Test (Correct)", "Test (Incorrect"),
+                     values = c(15,16,17,4)
+                     )
 
 print(state_trace_plot)
 ```

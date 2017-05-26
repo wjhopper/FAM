@@ -13,14 +13,7 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
-<style>
 
-img {
-  padding: 10px;
-  border-bottom: 2px solid #000;
-}
-
-</style>
 ```{r setup, include=FALSE}
 devtools::load_all()
 library(dplyr)
@@ -154,7 +147,7 @@ grid.draw(g)
 ## Accuracy and RT by Experimental Condition
 ```{r IV}
 anova_data <- bySubject_group_prac_OCprac %>%
-  filter( acc ==1 ) %>%
+  filter(acc == 1) %>%
   mutate(subject = factor(subject),
          condition = interaction( practice,  OCpractice )
          )
@@ -194,35 +187,101 @@ logRT_anova_OC_only <- aov(model,
 pander(summary(logRT_anova_OC_only), caption="Other-Cue Only log RT")
 ```
 
+## Conditional Accuracy and RT
+
+```{r conditional}
+tp_conditional_data <- LB4L2_tp %>%
+  ungroup() %>%
+  select(subject, group, list, round, target, sameCue, acc, RT) %>%
+  rename(prac_RT = RT, prac_acc = acc) %>%
+  ungroup() %>%
+  gather(key = DV, value = value, prac_RT, prac_acc) %>%
+  unite(col = DV, DV, round) %>%
+  spread(key = DV, value = value)
+
+final_conditional_data <- LB4L2_final %>%
+  ungroup() %>%
+  mutate(logRT = log(RT)) %>%  
+  select(subject, group, list, target, practice, OCpractice, acc, RT, logRT) %>%
+  filter(practice == "T" | OCpractice == "T") %>%
+  select(-practice, -OCpractice) %>%
+  rename(final_RT = RT, final_acc = acc, final_logRT = logRT)
+
+raw_conditional <- full_join(tp_conditional_data,
+                             final_conditional_data,
+                             by = c("subject", "group", "list", "target")
+                             )
+
+conditional_bySubject <- raw_conditional %>%
+  group_by(subject, group, sameCue, prac_acc_1) %>%
+  summarise(acc_mean = mean(final_acc),
+            acc_n = n(),
+            RT_mean = mean(final_RT, na.rm=TRUE),
+            logRT_mean = mean(final_logRT, na.rm=TRUE),
+            RT_n = sum(!is.na(final_RT))
+            ) %>%
+  ungroup() %>%
+  complete(nesting(subject, group), sameCue, prac_acc_1,
+           fill = list(acc_mean = 0))
+
+conditional <- conditional_bySubject %>%
+  group_by(group, sameCue, prac_acc_1) %>%
+  summarise(p_n = n(),
+            p_sem = whoppeR::sem(acc_mean),
+            p_CI_width = p_sem * qt(.975, p_n - 1),
+            p = mean(acc_mean),
+            RT_n = sum(!is.na(RT_mean)),
+            RT_mean_sem =  whoppeR::sem(RT_mean, na.rm = TRUE),
+            RT_CI_width = RT_mean_sem * qt(.975, RT_n - 1),
+            RT_mean = mean(RT_mean, na.rm = TRUE),
+            logRT_mean_sem =  whoppeR::sem(logRT_mean, na.rm = TRUE),
+            logRT_CI_width = logRT_mean_sem * qt(.975, RT_n - 1),
+            logRT_mean = mean(logRT_mean, na.rm = TRUE)
+            ) %>%
+  ungroup() %>%
+  mutate(p_CI_upper = p  + p_CI_width,
+         p_CI_lower = p - p_CI_width,
+         RT_mean_CI_upper = RT_mean + RT_CI_width,
+         RT_mean_CI_lower = RT_mean - RT_CI_width,
+         logRT_mean_CI_upper = logRT_mean + logRT_CI_width,
+         logRT_mean_CI_lower = logRT_mean - logRT_CI_width) %>%
+  select(-contains("width"))
+```
+
 ## State-Trace Plots
 ```{r state_trace}
 SC_immediate <- filter(byGroup_prac_OCprac,
                        group == "immediate",
-                       OCpractice == "N")
+                       OCpractice == "N") %>%
+  select(-OCpractice)
+SC_immediate_conditional <- filter(conditional,
+                                   group == "immediate",
+                                   sameCue == "yes") %>%
+  mutate(practice = recode(prac_acc_1, `0`="T_inc", `1`="T_cor")) %>%
+  select(-prac_acc_1, -sameCue)
+state_trace_data <- bind_rows(filter(SC_immediate, practice != "T") %>%
+                                select(-contains("median"), -contains("recentered")),
+                              SC_immediate_conditional)
 
-state_trace_plot <- ggplot(SC_immediate,
+state_trace_plot <- ggplot(state_trace_data,
                            aes(x=p, y=logRT_mean, shape=practice)) +
-  geom_point(size=2) +
+  geom_point(size=3) +
   geom_errorbar(aes(ymax=logRT_mean_CI_upper,
                     ymin=logRT_mean_CI_lower),
                 width=.025) +
   geom_errorbarh(aes(xmax=p_CI_upper,
                      xmin=p_CI_lower),
                  height=.025) +
-  scale_shape_discrete("Practice\nCondition",
-                       labels = c("Baseline", "Restudy", "Test")) +
-  scale_x_continuous("Accuracy", limits = c(.5, 1)) + 
+  scale_shape_manual("Practice\nCondition",
+                     labels = c("Baseline", "Restudy", "Test (Correct)", "Test (Incorrect)"),
+                     values = c(15,16,17,4)
+                     ) +
+  scale_x_continuous("Accuracy") + 
   scale_y_continuous("Log Scale RT (seconds)",
-                     labels = as.character(round(exp(seq(.2, .7, by=.1)), 2)))
+                     breaks = seq(.2, .8, by=.1),
+                     labels = as.character(round(exp(seq(.2, .8, by=.1)), 2)))
 
 print(state_trace_plot)
-```
-
-## Conditional Accuracy and RT
-```{r conditionals}
-# CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1, conditional = TRUE)
-# autoplot(CD_1, DV = "accuracy")
-# autoplot(CD_1, DV = "RT")
 ```
 
 ## Joint Accuracy and RT
