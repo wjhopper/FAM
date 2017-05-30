@@ -20,7 +20,7 @@ Suggests:
     grid,
     gridExtra,
     pander,
-    wesandersen,
+    wesanderson,
     testthat,
     svglite,
     afex
