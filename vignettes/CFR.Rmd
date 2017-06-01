@@ -687,6 +687,26 @@ par(mfcol=c(1,1))
 panderOptions('knitr.auto.asis', TRUE)
 ```
 
+```{r follow_up_ANOVA, include=FALSE}
+model_formula <- update(base_formula, paste("logRT_mean", deparse(base_formula)))
+
+np_tp_only_anova <- aov_car(model_formula,
+                            data = mutate_at(filter(bySubjects_cond_revOrder_noMissing,
+                                                    class %in% c("np", "tp")
+                                                    ),
+                                             .cols = c("subject", "class", "revOrder"),
+                                             .funs = factor)
+                            )
+
+np_sp_only_anova <- aov_car(model_formula,
+                            data = mutate_at(filter(bySubjects_cond_revOrder_noMissing,
+                                                    class %in% c("np", "sp")
+                                                    ),
+                                             .cols = c("subject", "class", "revOrder"),
+                                             .funs = factor)
+                            )
+
+```
 ## Final Figures
 
 ```{r difference_datasets}

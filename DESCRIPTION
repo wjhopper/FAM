@@ -1,6 +1,6 @@
 Package: FAM
 Title: Forgetting and Memory, an Investigation of the Testing Effect
-Version: 0.0.02.9008
+Version: 0.0.02.9009
 Authors@R: person("Will", "Hopper", email = "whopper@psych.umass.edu", role = c("aut", "cre"))
 Description: Contains the analysis of 3 experimental datasets. List Before the
     Last (LB4L), Switch Cue Keep Target (SCKT) and Cumulative Free Recall (CFR).
