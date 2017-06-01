@@ -14,6 +14,7 @@
 #' @note Trials where no keys were pressed by the participant are excluded from
 #' the RT summary.
 #'
+#' @importFrom tidyr replace_na
 #' @export
 summary.LB4L <- function(data, level = "subject") {
 
@@ -42,12 +43,13 @@ summary.LB4L <- function(data, level = "subject") {
     summarise(RT_median = median(RT, na.rm = TRUE),
               RT_mean = mean(RT, na.rm = TRUE),
               logRT_mean = mean(logRT, na.rm = TRUE),
-              N = sum(!is.na(RT))
+              N_acc = n(),
+              N_RT = sum(!is.na(RT))
     ) %>%
     right_join(y = fill_frame, by = intersect(names(.), names(fill_frame))) %>%
     ungroup() %>%
-    mutate(N = replace(N, is.na(N), 0),
-           p = N/cell_max) %>%
+    replace_na(list(N_acc = 0, N_RT = 0)) %>%
+    mutate(p = N_acc/cell_max) %>%
     arrange(subject)
 
   return(as_LB4L_summary(summarized_data))

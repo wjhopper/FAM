@@ -35,7 +35,7 @@ byGroup_prac_OCprac <- summary(bySubject_group_prac_OCprac)
 ```{r difference_sem_plot, fig.height=6.5, fig.width = 8.5, dev="svglite"}
 diff_bySubject_group_prac_OCprac <- bySubject_group_prac_OCprac %>%
   filter(acc==1) %>%
-  select(-acc, -N, -cell_max) %>%
+  select(-acc, -N_acc, -N_RT, -cell_max) %>%
   gather(key="var", value="value", p, RT_median, RT_mean, logRT_mean) %>%
   unite(condition, practice, OCpractice, sep=".") %>%
   spread(condition, value) %>%
@@ -52,8 +52,8 @@ diff_bySubject_group_prac_OCprac <- bySubject_group_prac_OCprac %>%
 diff_byGroup_prac_OCprac <- diff_bySubject_group_prac_OCprac %>%
   group_by(group, practice, cue_type) %>%
   summarise_at(c("p","logRT_mean","RT_mean","RT_median"),
-            funs(sem = whoppeR::sem(., na.rm=TRUE))
-            )  %>%
+               funs(sem = whoppeR::sem(., na.rm=TRUE))
+               )  %>%
   rename_(.dots=setNames(names(.),
                          gsub("_mean$", "", names(.))
                          )
@@ -62,7 +62,7 @@ diff_byGroup_prac_OCprac <- diff_bySubject_group_prac_OCprac %>%
 intervention <- filter(byGroup_prac_OCprac, !(practice == "N" & OCpractice == "N")) %>%
   select(group, practice, OCpractice, p, RT_mean, logRT_mean, RT_median) %>%
   recode_conditions() %>%
-  left_join(diff_byGroup_prac_OCprac)
+  left_join(diff_byGroup_prac_OCprac, by = c("group", "practice", "cue_type"))
 
 control <- filter(byGroup_prac_OCprac, practice == "N", OCpractice == "N") %>%
   select(group, practice, OCpractice, p, RT_mean, logRT_mean, RT_median) %>%
