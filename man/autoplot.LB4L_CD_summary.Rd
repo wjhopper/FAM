@@ -12,4 +12,3 @@
 \description{
 Plot Accuracy or RT for each experimental condition of the LB4L2 dataset
 }
-

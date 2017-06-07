@@ -24,4 +24,3 @@ either the subject-level or condition-levels means for each experimental conditi
 Trials where no keys were pressed by the participant are excluded from
 the RT summary.
 }
-
