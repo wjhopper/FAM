@@ -23,6 +23,7 @@ library(ggplot2)
 library(grid)
 library(gridExtra)
 library(pander)
+library(afex)
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.align='center', fig.width = 8)
 ```
 
@@ -149,42 +150,54 @@ grid.draw(g)
 anova_data <- bySubject_group_prac_OCprac %>%
   filter(acc == 1) %>%
   mutate(subject = factor(subject),
+         group = factor(group),
          condition = interaction( practice,  OCpractice )
          )
 model <- . ~ group * condition + Error(subject/condition)
 
+#### Accuracy ############################################
 model[[2]] <- quote(p)
-acc_anova <- aov(p ~ group * condition + Error(subject/condition),
-                 data = anova_data)
-pander(summary(acc_anova), caption="Accuracy")
+acc_anova <- aov_car(model, data = anova_data)
+pander(nice(acc_anova), caption="Accuracy")
 
+#### Median RT ###########################################
 model[[2]] <- quote(RT_median)
-RT_median_anova <- aov(model,
-                data = group_by(anova_data, subject) %>%
-                       summarise(missing = anyNA(RT_median)) %>%
-                       filter(!missing) %>%
-                       inner_join(anova_data, by="subject")
-                )
-pander(summary(RT_median_anova), caption="median RT")
+RT_median_anova <- aov_car(model,
+                           data = group_by(anova_data, subject) %>%
+                             summarise(missing = anyNA(RT_median)) %>%
+                             filter(!missing) %>%
+                             inner_join(anova_data, by = "subject")
+                             )
+pander(nice(RT_median_anova), caption="Median RT")
 
 model[[2]] <- quote(logRT_mean)
-logRT_anova <- aov(model,
-                   data = group_by(anova_data, subject) %>%
-                    summarise(missing = anyNA(logRT_mean)) %>%
-                    filter(!missing) %>%
-                    inner_join(anova_data, by = "subject")
+logRT_anova <- aov_car(model,
+                       data = group_by(anova_data, subject) %>%
+                         summarise(missing = anyNA(logRT_mean)) %>%
+                         filter(!missing) %>%
+                         inner_join(anova_data, by = "subject")
                    )
-pander(summary(logRT_anova), caption="log RT")
+pander(nice(logRT_anova), caption="log RT")
 
-logRT_anova_OC_only <- aov(model,
-                           data = group_by(anova_data, subject) %>%
-                             summarise(missing = anyNA(logRT_mean)) %>%
-                             filter(!missing) %>%
-                             inner_join(anova_data, by = "subject") %>%
-                             ungroup() %>%
-                             filter((practice=="N" & OCpractice=="N") | OCpractice %in% c("S","T"))
-                           )
-pander(summary(logRT_anova_OC_only), caption="Other-Cue Only log RT")
+logRT_anova_OC_only <- aov_car(model,
+                               data = group_by(anova_data, subject) %>%
+                                 summarise(missing = anyNA(logRT_mean)) %>%
+                                 filter(!missing) %>%
+                                 inner_join(anova_data, by = "subject") %>%
+                                 ungroup() %>%
+                                 filter((practice == "N" &  OCpractice == "N") | OCpractice %in% c("S", "T"))
+                                 )
+pander(nice(logRT_anova_OC_only), caption="Other-Cue Only log RT")
+
+logRT_anova_SC_only <- aov_car(model,
+                               data = group_by(anova_data, subject) %>%
+                                 summarise(missing = anyNA(logRT_mean)) %>%
+                                 filter(!missing) %>%
+                                 inner_join(anova_data, by = "subject") %>%
+                                 ungroup() %>%
+                                 filter((practice == "N" &  OCpractice == "N") | practice %in% c("S", "T"))
+                                 )
+pander(nice(logRT_anova_SC_only), caption="Same-Cue Only log RT")
 ```
 
 ## Conditional Accuracy and RT
