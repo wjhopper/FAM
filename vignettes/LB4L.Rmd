@@ -31,10 +31,10 @@ knitr::opts_chunk$set(echo = FALSE,fig.width=11,fig.height=7,cache=FALSE,
 Start by removing any subjects with less than 5% accuracy across all conditions. They are not helpful.
 
 ```{r removeBaddies} 
-  subject_means <- badSubs(LB4L_allSs)
-  print(subject_means$removed)
-  LB4L_allSs <- filter(LB4L_allSs, !(subject %in% subject_means$removed))
-  LB4L_allSs$subject <- factor(LB4L_allSs$subject)
+subject_means <- badSubs(LB4L_allSs)
+LB4L_allSs <- filter(LB4L_allSs, !(subject %in% subject_means$removed))
+LB4L_allSs$subject <- factor(LB4L_allSs$subject)
+print(paste0("Removed Subjects: ", subject_means$removed))
 ```
 
 
@@ -60,7 +60,8 @@ Start by removing any subjects with less than 5% accuracy across all conditions.
 
 ## Grand Average Performance
 ```{r grandAvg}
-group_means <-  LB4L_allSs %>% filter(list != 1) %>%
+group_means <-  LB4L_allSs %>%
+  filter(list != 1) %>%
   group_by(group) %>%
   summarise(final_acc=mean(final_score, na.rm=T),
             prac_acc = mean(prac_score, na.rm=T))
