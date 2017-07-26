@@ -107,7 +107,7 @@ RT <- acc %+%
   aes(y = logRT_mean,
       ymin = logRT_mean - logRT_mean_sem,
       ymax = logRT_mean + logRT_mean_sem) +
-  scale_y_continuous("Log Scale RT (seconds)",
+  scale_y_continuous("Recall Latency (log scale seconds)",
                      breaks = c(.2, .4, .6, .8, 1),
                      labels = as.character(round(exp(c(.2, .4, .6, .8, 1)), 2))
                      ) +
@@ -117,7 +117,7 @@ RT <- acc %+%
   scale_shape_discrete(name="Practice\nCondition",
                        labels = c("Baseline","Restudy", "Test Practice")) +
 
-  ggtitle("Reaction Time") +
+  ggtitle("Recall Latency") +
   theme(strip.text.y = element_text(angle=0,
                                     size = 18,
                                     margin = margin(l=8)),
@@ -128,7 +128,7 @@ RT <- acc %+%
 g <- arrangeGrob(acc, RT,
                  nrow = 1,
                  ncol = 2,
-                 widths = c(.37, .63))
+                 widths = c(.395, .605))
 grid.draw(g)
 
 # CD <- summary(LB4L2_final, level = "group", given_practice = TRUE, conditional = TRUE) 
@@ -290,7 +290,7 @@ state_trace_plot <- ggplot(state_trace_data,
                      values = c(15,16,17,4)
                      ) +
   scale_x_continuous("Accuracy") + 
-  scale_y_continuous("Log Scale RT (seconds)",
+  scale_y_continuous("Recall Latency (log scale seconds)",
                      breaks = seq(.2, .8, by=.1),
                      labels = as.character(round(exp(seq(.2, .8, by=.1)), 2)))
 
