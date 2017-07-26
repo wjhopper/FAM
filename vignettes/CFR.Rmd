@@ -788,11 +788,11 @@ byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
                         labels=c("Baseline","Restudy","Test Practice"),
                         values= c("solid","dotted","dashed")) +
   scale_x_reverse("Output Position",
-                     breaks=1:max(byCond_revOrder_noMissing$revOrder),
-                     labels = c("n",
-                                paste("n-", 1:(max(byCond_revOrder_noMissing$revOrder)-1),
-                                      sep=''))
-                     ) +
+                  breaks=1:max(byCond_revOrder_noMissing$revOrder),
+                  labels = c("n",
+                            paste("n-", 1:(max(byCond_revOrder_noMissing$revOrder)-1),
+                                  sep=''))
+                  ) +
   scale_y_continuous("Log Scale IRT (seconds)",
                      breaks = RT_breaks,
                      labels = as.character(round(exp(RT_breaks),2))
@@ -815,3 +815,39 @@ g2 <- arrangeGrob(plot_gamma_vs_list_diff,
 grid.draw(g2)
 ```
 
+```{r last_7_state_trace, include=FALSE}
+
+x <- WISEsummary(bySubjects_cond_revOrder_noMissing,
+                 dependentvars = "logRT_mean",
+                 withinvars = "class",
+                 idvar = "subject") %>% 
+  rename_(.dots=setNames(names(.),
+                         gsub("_mean$", "", names(.))
+                         )
+          ) %>%
+  select(class, logRT_mean, logRT_mean_CI_upper, logRT_mean_CI_lower) %>%
+  left_join(x = .,
+            y = byCond[c("class", "acc_mean", "acc_mean_CI_upper", "acc_mean_CI_lower")],
+            by = "class"
+            )
+
+
+x_plot <- ggplot(x, aes(x=acc_mean, y=logRT_mean, shape=class)) +
+  geom_point(size=2) +
+  geom_errorbar(aes(ymin=logRT_mean_CI_upper,
+                    ymax=logRT_mean_CI_lower),
+                width=.05) +
+  geom_errorbarh(aes(xmin=acc_mean_CI_upper,
+                     xmax=acc_mean_CI_lower),
+                 height=.05) +
+  scale_x_continuous("Accuracy", limits=c(.5, 1)) + 
+  scale_y_continuous("Recall Latency (log scale seconds)",
+                     limits = c(.15, .8),
+                     breaks = seq(.2, .8, by = .1),
+                     labels = as.character(round(exp(seq(.2, .8, by = .1)), 2))) +
+  scale_shape_discrete("Practice\nCondition",
+                       labels = c("Baseline", "Restudy", "Test")
+                       )
+
+print(x_plot)
+```
