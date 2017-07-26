@@ -552,7 +552,7 @@ state_trace_plot <- ggplot(state_trace_data,
                      xmax=acc_mean_CI_lower),
                  height=.05) +
   scale_x_continuous("Accuracy", limits=c(0,1)) + 
-  scale_y_continuous("Log Scale RT (seconds)",
+  scale_y_continuous("Recall Latency (log scale seconds)",
                      breaks = seq(.5, 2, by=.5),
                      labels = as.character(round(exp(seq(.5, 2, by=.5)), 2))) +
   scale_shape_manual("Practice\nCondition",
