@@ -215,6 +215,7 @@ conditional_means_bySubject <- conditional_raw %>%
             logRT_mean = mean(tp_logRT, na.rm=TRUE),
             RT_n = sum(!is.na(tp_RT))
             ) %>%
+  ungroup() %>%
   tidyr::complete(subject, np_score)
 
 conditional_means <- conditional_means_bySubject %>%
@@ -458,7 +459,7 @@ gamma_cor_bySubject_pooling_lists <- ranks %>%
   mutate(gamma = (concordances-discordances)/(concordances+discordances),
          gamma_z = atanh(gamma)) # fischer-z transformed the correlation
 
-Ncorrect_diff <- N_correct %>%
+Ncorrect_diff <- ungroup(N_correct) %>%
   filter(class %in% c("np","tp")) %>%
   spread(class,nRecalled) %>%
   mutate(N_diff = tp-np) %>%
