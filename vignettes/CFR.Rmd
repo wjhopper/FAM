@@ -578,11 +578,14 @@ qplot(x=class, y=acc_mean, data=byCond)
 ### Accuracy ANOVA
 
 ```{r accAnova, output="asis", fig.width=5, fig.height=5}
-accAnova <- aov(acc_mean~ class + Error(subject/class),
-                data = mutate_at(bySubjects_cond, c("subject","class"), factor))  
-pander(summary(accAnova), style="rmarkdown")
+opts = options(stringsAsFactors = TRUE)
+accAnova <- aov_car(acc_mean ~ Error(subject/class),
+                    data = mutate_at(bySubjects_cond, c("subject","class"), factor),
+                    anova_table=list(correction = "none", es = 'pes'))
+options(opts)
+pander(nice(accAnova), style="rmarkdown")
 
-x <- proj(accAnova)
+x <- proj(accAnova$aov)
 qqnorm(x[["subject:class"]][,'Residuals'], main = "subject:class",
        ylab = "Sample Quantiles subject:class")
 qqline(x[["subject:class"]][,'Residuals'])
