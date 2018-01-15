@@ -186,6 +186,8 @@ byCond_revOrder_noMissing <- filter(byCond_revOrder,
 bySubjects_cond_revOrder_noMissing <- filter(bySubjects_cond_revOrder,
                                              revOrder <= min(max_complete$max_position))
 
+bySubjects_cond_order_noMissing <- filter(bySubjects_cond_order,
+                                          output_order <= min(max_complete$max_position))
 ```
 
 ```{r conditional}
@@ -706,9 +708,16 @@ np_sp_only_anova <- aov_car(model_formula,
                                              .funs = factor)
                             )
 
+RT_order_anova <- aov_car(logRT_mean ~ class*output_order + Error(subject/(class*output_order)),
+                          data = mutate_at(bySubjects_cond_order_noMissing,
+                                           .cols = c("subject","class","output_order"),
+                                           .funs = factor
+                                           )
+                          )
+pairs(lsmeans(RT_order_anova, ~ class))
 ```
-## Final Figures
 
+## Final Figures
 ```{r difference_datasets}
 diff_bySubjects_cond <- bySubjects_cond %>%
   select(subject, class, acc_mean) %>%
