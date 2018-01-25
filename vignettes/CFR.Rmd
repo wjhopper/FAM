@@ -619,11 +619,15 @@ qplot(x=class, y=RT_mean, data=byCond)
 ### Log-RT ANOVA
 
 ```{r rt_anova, output="asis", fig.width=5, fig.height=5}
-RTanova <- aov(logRT_mean ~ class + Error(subject/class),
-                data = mutate_at(bySubjects_cond, c("subject","class"), factor))  
-pander(summary(RTanova), style="rmarkdown")
+opts = options(stringsAsFactors = TRUE)
+RTanova <- aov_car(logRT_mean ~ class + Error(subject/class),
+                   data = mutate_at(bySubjects_cond, c("subject","class"), factor),
+                   anova_table = list(es = 'pes'))
+options(opts)
 
-x <- proj(RTanova)
+pander(nice(RTanova), style="rmarkdown")
+
+x <- proj(RTanova$aov)
 qqnorm(x[["subject:class"]][,'Residuals'], main = "subject:class",
        ylab = "Sample Quantiles subject:class")
 qqline(x[["subject:class"]][,'Residuals'])
@@ -660,11 +664,12 @@ for (DV in c("RT_mean", "RT_median", "logRT_mean")) {
   model_formula <- update(base_formula, paste(DV, deparse(base_formula)))
   
   RT_revOrder_anova <- aov_car(model_formula,
-                                  data = mutate_at(bySubjects_cond_revOrder_noMissing,
-                                                   .cols = c("subject","class","revOrder"),
-                                                   .funs = factor
-                                                   )
-                                  )
+                               data = mutate_at(bySubjects_cond_revOrder_noMissing,
+                                                .cols = c("subject","class","revOrder"),
+                                                .funs = factor
+                                                ),
+                               anova_table = list(es = 'pes')
+                               )
   pander(nice(RT_revOrder_anova), style="rmarkdown",
          caption = paste(deparse(model_formula, width.cutoff = 200L), "ANOVA")
          )
@@ -701,23 +706,23 @@ np_tp_only_anova <- aov_car(model_formula,
                                                     class %in% c("np", "tp")
                                                     ),
                                              .cols = c("subject", "class", "revOrder"),
-                                             .funs = factor)
-                            )
+                                             .funs = factor),
+                            anova_table = list(es = 'pes'))
 
 np_sp_only_anova <- aov_car(model_formula,
                             data = mutate_at(filter(bySubjects_cond_revOrder_noMissing,
                                                     class %in% c("np", "sp")
                                                     ),
                                              .cols = c("subject", "class", "revOrder"),
-                                             .funs = factor)
-                            )
+                                             .funs = factor),
+                            anova_table = list(es = 'pes'))
 
 RT_order_anova <- aov_car(logRT_mean ~ class*output_order + Error(subject/(class*output_order)),
                           data = mutate_at(bySubjects_cond_order_noMissing,
                                            .cols = c("subject","class","output_order"),
                                            .funs = factor
-                                           )
-                          )
+                                           ),
+                          anova_table = list(es = 'pes'))
 pairs(lsmeans(RT_order_anova, ~ class))
 ```
 
