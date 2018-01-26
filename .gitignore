@@ -1,9 +1,10 @@
 .Rproj.user
 .Rhistory
 .RData
+*.Rda
 inst/doc
 .build.timestamp
-/*.R*
+/*.R
 ./man/CFR_PCR.Rd
 ./man/IVsummary.Rd
 ./man/LB4L_PCRss.Rd
