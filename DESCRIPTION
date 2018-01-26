@@ -23,7 +23,9 @@ Suggests:
     wesanderson,
     testthat,
     svglite,
-    afex
+    afex,
+    rococo,
+    broom
 License: CC0
 LazyData: true
 VignetteBuilder: knitr
