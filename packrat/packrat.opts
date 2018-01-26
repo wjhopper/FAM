@@ -79,7 +79,6 @@ external.packages:
     svglite
     testthat
     tibble
-    tidyr
     viridis
     viridisLite
     wesanderson
