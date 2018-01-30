@@ -772,11 +772,11 @@ theme_set(theme_bw(base_size = 16) +
           theme(panel.grid = element_blank())
           )
 
-byCond_acc_plot <- ggplot(diff_byCond,
+byCond_acc_plot <- ggplot(byCond,
                           aes(x=" ",
                               y=acc_mean,
-                              ymin = acc_mean - sem,
-                              ymax = acc_mean + sem,
+                              ymin = acc_mean - acc_mean_sem,
+                              ymax = acc_mean + acc_mean_sem,
                               shape = class)) +
   geom_point(size=3,
              position=position_dodge(.2)) +
@@ -791,10 +791,10 @@ byCond_acc_plot <- ggplot(diff_byCond,
 RT_breaks <- seq(round(min(byCond_revOrder_noMissing$logRT_mean),0),
                  round(max(byCond_revOrder_noMissing$logRT_mean),0),
                  by=.5)
-byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
+byCond_revOrder_RTplot <- ggplot(byCond_revOrder_noMissing,
                                  aes(x=revOrder, y=logRT_mean,
-                                     ymin = logRT_mean - sem,
-                                     ymax = logRT_mean + sem,
+                                     ymin = logRT_mean - logRT_mean_sem,
+                                     ymax = logRT_mean + logRT_mean_sem,
                                      shape = class,
                                      linetype = class)) +
   geom_point(size=3) +
