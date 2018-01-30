@@ -709,6 +709,7 @@ np_tp_only_anova <- aov_car(model_formula,
                                              .cols = c("subject", "class", "revOrder"),
                                              .funs = factor),
                             anova_table = list(es = 'pes'))
+pander(nice(np_tp_only_anova), "No Practice vs Test Practice")
 
 np_sp_only_anova <- aov_car(model_formula,
                             data = mutate_at(filter(bySubjects_cond_revOrder_noMissing,
@@ -717,6 +718,7 @@ np_sp_only_anova <- aov_car(model_formula,
                                              .cols = c("subject", "class", "revOrder"),
                                              .funs = factor),
                             anova_table = list(es = 'pes'))
+pander(nice(np_sp_only_anova), "No Practice vs Restudy")
 
 RT_order_anova <- aov_car(logRT_mean ~ class*output_order + Error(subject/(class*output_order)),
                           data = mutate_at(bySubjects_cond_order_noMissing,
