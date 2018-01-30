@@ -583,7 +583,7 @@ qplot(x=class, y=acc_mean, data=byCond)
 opts = options(stringsAsFactors = TRUE)
 accAnova <- aov_car(acc_mean ~ Error(subject/class),
                     data = mutate_at(bySubjects_cond, c("subject","class"), factor),
-                    anova_table=list(correction = "none", es = 'pes'))
+                    anova_table=list(es = 'pes'))
 options(opts)
 pander(nice(accAnova), style="rmarkdown")
 
