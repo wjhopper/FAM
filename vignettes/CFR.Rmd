@@ -39,8 +39,7 @@ class_labels <- c(np="Practice Test", sp="Study Practice", tp="Test Practice")
 ```
 
 ```{r testonlyData}
-minimal_variables <- c("subject","cond_list","class","resp","order",
-                       "score", "RT")
+minimal_variables <- c("subject","cond_list","class","resp","score", "RT")
 
 data(CFR, package = "FAM")
 
@@ -48,8 +47,7 @@ tested <- filter(CFR, !is.na(resp))
 tested$score <- as.integer(tested$score)
 
 corrects <- filter(tested, score==1) %>%
-  select_(.dots = c(minimal_variables[!(minimal_variables == "order")],
-                    "target","resp","where")) %>%
+  select_(.dots = c(minimal_variables, "target","resp", "where")) %>%
   group_by(subject,class,cond_list) %>%
   mutate(output_order = 1:n(),
          revOrder = rev(output_order),
