@@ -721,13 +721,14 @@ pander(nice(np_sp_only_anova), "No Practice vs Restudy")
 
 ```{r first_seven, include=FALSE}
 RT_order_anova <- aov_car(logRT_mean ~ class*output_order + Error(subject/(class*output_order)),
-                          data = mutate_at(bySubjects_cond_order_noMissing,
-                                           .cols = c("subject","class","output_order"),
+                          data = filter(bySubjects_cond_order_noMissing,
+                                        output_order > 1) %>%
+                                 mutate_at(.cols = c("subject","class","output_order"),
                                            .funs = factor
                                            ),
                           anova_table = list(es = 'pes'))
 pander(nice(RT_order_anova), "First 7 ANOVA")
-pairs(lsmeans(RT_order_anova, ~ class), adjust = "scheffe")
+pairs(lsmeans(RT_order_anova, ~ class), adjust = "bonferroni")
 ```
 
 ## Final Figures
