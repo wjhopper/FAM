@@ -363,3 +363,14 @@ Quantiles are calculated using all observed RT's within a condition, pooled over
 # 
 # quantile_plot %+% pooled_quantiles_correct
 ```
+
+
+```{r nuisance_RT}
+x <- group_by(LB4L2_tp, subject, list, round) %>%
+  mutate(duration = lead(onset) - onset) %>%
+  ungroup() %>%  
+  filter(!is.na(duration)) %>%
+  summarise(avg_dur = mean(duration),
+            avg_log_dur = mean(log(duration)))
+```
+
