@@ -663,8 +663,9 @@ for (DV in c("RT_mean", "RT_median", "logRT_mean")) {
   model_formula <- update(base_formula, paste(DV, deparse(base_formula)))
   
   RT_revOrder_anova <- aov_car(model_formula,
-                               data = mutate_at(bySubjects_cond_revOrder_noMissing,
-                                                .cols = c("subject","class","revOrder"),
+                               data = filter(bySubjects_cond_revOrder_noMissing,
+                                             revOrder < min(max_complete$max_position)) %>%
+                                      mutate_at(.cols = c("subject","class","revOrder"),
                                                 .funs = factor
                                                 ),
                                anova_table = list(es = 'pes')
@@ -793,7 +794,8 @@ byCond_acc_plot <- ggplot(byCond,
 RT_breaks <- seq(round(min(byCond_revOrder_noMissing$logRT_mean),0),
                  round(max(byCond_revOrder_noMissing$logRT_mean),0),
                  by=.5)
-byCond_revOrder_RTplot <- ggplot(byCond_revOrder_noMissing,
+byCond_revOrder_RTplot <- ggplot(filter(byCond_revOrder_noMissing,
+                                        revOrder < min(max_complete$max_position)),
                                  aes(x=revOrder, y=logRT_mean,
                                      ymin = logRT_mean - logRT_mean_sem,
                                      ymax = logRT_mean + logRT_mean_sem,
