@@ -1,9 +1,10 @@
 .Rproj.user
 .Rhistory
 .RData
+*.Rda
 inst/doc
 .build.timestamp
-/*.R*
+/*.R
 ./man/CFR_PCR.Rd
 ./man/IVsummary.Rd
 ./man/LB4L_PCRss.Rd
@@ -12,3 +13,4 @@ inst/doc
 ./man/heirarchicalSummary.Rd
 ./man/performanceBins.Rd
 vignettes/*cache
+packrat/lib*/

@@ -14,6 +14,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 ```{r knitr_setup, cache=FALSE,echo=FALSE, warning=F, include=FALSE, message=FALSE}
+source("../.Rprofile", chdir = TRUE)
 library(FAM)
 library(whoppeR)
 library(dplyr)
@@ -38,8 +39,7 @@ class_labels <- c(np="Practice Test", sp="Study Practice", tp="Test Practice")
 ```
 
 ```{r testonlyData}
-minimal_variables <- c("subject","cond_list","class","resp","order",
-                       "score", "RT")
+minimal_variables <- c("subject","cond_list","class","resp","score", "RT")
 
 data(CFR, package = "FAM")
 
@@ -47,8 +47,7 @@ tested <- filter(CFR, !is.na(resp))
 tested$score <- as.integer(tested$score)
 
 corrects <- filter(tested, score==1) %>%
-  select_(.dots = c(minimal_variables[!(minimal_variables == "order")],
-                    "target","resp","where")) %>%
+  select_(.dots = c(minimal_variables, "target","resp", "where")) %>%
   group_by(subject,class,cond_list) %>%
   mutate(output_order = 1:n(),
          revOrder = rev(output_order),
@@ -582,7 +581,7 @@ qplot(x=class, y=acc_mean, data=byCond)
 opts = options(stringsAsFactors = TRUE)
 accAnova <- aov_car(acc_mean ~ Error(subject/class),
                     data = mutate_at(bySubjects_cond, c("subject","class"), factor),
-                    anova_table=list(correction = "none", es = 'pes'))
+                    anova_table=list(es = 'pes'))
 options(opts)
 pander(nice(accAnova), style="rmarkdown")
 
@@ -698,7 +697,7 @@ par(mfcol=c(1,1))
 panderOptions('knitr.auto.asis', TRUE)
 ```
 
-```{r follow_up_ANOVA, include=FALSE}
+```{r follow_up_ANOVA}
 model_formula <- update(base_formula, paste("logRT_mean", deparse(base_formula)))
 
 np_tp_only_anova <- aov_car(model_formula,
@@ -708,6 +707,7 @@ np_tp_only_anova <- aov_car(model_formula,
                                              .cols = c("subject", "class", "revOrder"),
                                              .funs = factor),
                             anova_table = list(es = 'pes'))
+pander(nice(np_tp_only_anova), "No Practice vs Test Practice")
 
 np_sp_only_anova <- aov_car(model_formula,
                             data = mutate_at(filter(bySubjects_cond_revOrder_noMissing,
@@ -716,14 +716,19 @@ np_sp_only_anova <- aov_car(model_formula,
                                              .cols = c("subject", "class", "revOrder"),
                                              .funs = factor),
                             anova_table = list(es = 'pes'))
+pander(nice(np_sp_only_anova), "No Practice vs Restudy")
+```
 
+```{r first_seven}
 RT_order_anova <- aov_car(logRT_mean ~ class*output_order + Error(subject/(class*output_order)),
                           data = mutate_at(bySubjects_cond_order_noMissing,
                                            .cols = c("subject","class","output_order"),
                                            .funs = factor
                                            ),
                           anova_table = list(es = 'pes'))
-pairs(lsmeans(RT_order_anova, ~ class))
+pander(nice(RT_order_anova), "Forward-Order ANOVA")
+pander(summary(pairs(lsmeans(RT_order_anova, ~ class), adjust = "bonferroni")),
+       "Forward-Order Contrasts")
 ```
 
 ## Final Figures
@@ -769,11 +774,11 @@ theme_set(theme_bw(base_size = 16) +
           theme(panel.grid = element_blank())
           )
 
-byCond_acc_plot <- ggplot(diff_byCond,
+byCond_acc_plot <- ggplot(byCond,
                           aes(x=" ",
                               y=acc_mean,
-                              ymin = acc_mean - sem,
-                              ymax = acc_mean + sem,
+                              ymin = acc_mean - acc_mean_sem,
+                              ymax = acc_mean + acc_mean_sem,
                               shape = class)) +
   geom_point(size=3,
              position=position_dodge(.2)) +
@@ -788,10 +793,10 @@ byCond_acc_plot <- ggplot(diff_byCond,
 RT_breaks <- seq(round(min(byCond_revOrder_noMissing$logRT_mean),0),
                  round(max(byCond_revOrder_noMissing$logRT_mean),0),
                  by=.5)
-byCond_revOrder_RTplot <- ggplot(diff_byCond_revOrder_noMissing,
+byCond_revOrder_RTplot <- ggplot(byCond_revOrder_noMissing,
                                  aes(x=revOrder, y=logRT_mean,
-                                     ymin = logRT_mean - sem,
-                                     ymax = logRT_mean + sem,
+                                     ymin = logRT_mean - logRT_mean_sem,
+                                     ymax = logRT_mean + logRT_mean_sem,
                                      shape = class,
                                      linetype = class)) +
   geom_point(size=3) +

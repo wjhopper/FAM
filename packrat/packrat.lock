@@ -1,0 +1,556 @@
+PackratFormat: 1.4
+PackratVersion: 0.4.8.1
+RVersion: 3.4.0
+Repos: CRAN=https://cran.rstudio.com/,
+    CRANextra=http://www.stats.ox.ac.uk/pub/RWin,
+    WRAN=file:/Users/will/WRAN
+
+Package: BB
+Source: CRAN
+Version: 2014.10-1
+Hash: 53f4325e3a8baac9fcc50151ab165c18
+Requires: quadprog
+
+Package: BH
+Source: CRAN
+Version: 1.62.0-1
+Hash: 14dfb3e8ffe20996118306ff4de1fab2
+
+Package: DBI
+Source: CRAN
+Version: 0.6-1
+Hash: 4aef5bda70897c1663d5b8bae2f4419a
+
+Package: Formula
+Source: CRAN
+Version: 1.2-1
+Hash: 47ae34d89a8dd8fde36c9c0b5c587819
+
+Package: Hmisc
+Source: CRAN
+Version: 4.0-3
+Hash: 7e93c14752acdc238561bbdf56ad9ac2
+Requires: Formula, acepack, base64enc, data.table, ggplot2, gridExtra,
+    gtable, htmlTable, htmltools, latticeExtra, survival, viridis
+
+Package: MatrixModels
+Source: CRAN
+Version: 0.4-1
+Hash: 60a5c75e57aae4a0ce76cb7422939aaf
+
+Package: PCR
+Source: WRAN
+Version: 0.1.1.9001
+Hash: 5ccd7d42b6e22a1ee8c175dedd591bc4
+Requires: dplyr, whoppeR
+
+Package: R6
+Source: CRAN
+Version: 2.2.0
+Hash: 712773a3439bd32db5c40938e1a9aac2
+
+Package: RColorBrewer
+Source: CRAN
+Version: 1.1-2
+Hash: c0d56cd15034f395874c870141870c25
+
+Package: Rcgmin
+Source: CRAN
+Version: 2013-2.21
+Hash: 62da0d1f2df0c8d7e4f325160e6a7110
+Requires: numDeriv
+
+Package: Rcpp
+Source: CRAN
+Version: 0.12.10
+Hash: 6cf65d0dd6a92f2d43c8d4805d33efe9
+
+Package: RcppEigen
+Source: CRAN
+Version: 0.3.3.3.0
+Hash: dfb1146881f067234c80251f2d2f9e1c
+Requires: Rcpp
+
+Package: Rvmmin
+Source: CRAN
+Version: 2017-7.18
+Hash: a720678c3838d194fceb0750957b76a5
+Requires: optextras
+
+Package: SparseM
+Source: CRAN
+Version: 1.77
+Hash: 08f1f60e1038957030bcd9f4a58d22d8
+
+Package: TH.data
+Source: CRAN
+Version: 1.0-8
+Hash: 06a65803bc437e0e86280c425b850313
+Requires: survival
+
+Package: acepack
+Source: CRAN
+Version: 1.4.1
+Hash: 5ed3b04bc1fa1a934188fc6022d3ba7c
+
+Package: afex
+Source: CRAN
+Version: 0.17-8
+Hash: 54e271cbae40f908cb006474559ead58
+Requires: car, coin, lme4, lmerTest, lsmeans, pbkrtest, reshape2,
+    stringr
+
+Package: assertthat
+Source: CRAN
+Version: 0.2.0
+Hash: e8805df54c65ac96d50235c44a82615c
+
+Package: backports
+Source: CRAN
+Version: 1.0.5
+Hash: 8b835bdc5447f2c76fda198e17d6bda4
+
+Package: base64enc
+Source: CRAN
+Version: 0.1-3
+Hash: c590d29e555926af053055e23ee79efb
+
+Package: bitops
+Source: CRAN
+Version: 1.0-6
+Hash: 67d0775189fd0041d95abca618c5c07e
+
+Package: broom
+Source: CRAN
+Version: 0.4.3
+Hash: e796a434d80c7358cb3eb5acb142fb45
+Requires: dplyr, plyr, psych, reshape2, stringr, tidyr
+
+Package: caTools
+Source: CRAN
+Version: 1.17.1
+Hash: 97cb6f6293cd18d17df77a6383cc6763
+Requires: bitops
+
+Package: car
+Source: CRAN
+Version: 2.1-4
+Hash: d8cc2f66d4ba0c91312f1c1c5773d502
+Requires: pbkrtest, quantreg
+
+Package: checkmate
+Source: CRAN
+Version: 1.8.2
+Hash: ca9a37c13c0fead85d580384ce5e25dc
+Requires: backports
+
+Package: coda
+Source: CRAN
+Version: 0.19-1
+Hash: e5aff7792ef292cd4306e58e25e403fe
+
+Package: coin
+Source: CRAN
+Version: 1.1-3
+Hash: 3c6505e1f6b3c5f08b89cf7a74eb7d7b
+Requires: modeltools, multcomp, mvtnorm, survival
+
+Package: colorspace
+Source: CRAN
+Version: 1.3-2
+Hash: 0bf8618b585fa98eb23414cd3ab95118
+
+Package: crayon
+Source: CRAN
+Version: 1.3.2
+Hash: 576a9d297a567d6a5ebd164ca5221590
+
+Package: data.table
+Source: CRAN
+Version: 1.10.4
+Hash: 2c7c47ccb40d01c7b214c8eff818108d
+
+Package: dfoptim
+Source: CRAN
+Version: 2017.12-1
+Hash: 2393844616246bbd5568a76b8cea8d46
+
+Package: dichromat
+Source: CRAN
+Version: 2.0-0
+Hash: 08eed0c80510af29bb15f840ccfe37ce
+
+Package: digest
+Source: CRAN
+Version: 0.6.12
+Hash: e53fb8c58673df868183697e39a6a4d6
+
+Package: dplyr
+Source: CRAN
+Version: 0.5.0
+Hash: 673660fd0b947477dab1044abc8b2c95
+Requires: BH, DBI, R6, Rcpp, assertthat, lazyeval, magrittr, tibble
+
+Package: effsize
+Source: CRAN
+Version: 0.7.1
+Hash: d780d7cbed7c9cef8f4186fbc6d59fd3
+
+Package: estimability
+Source: CRAN
+Version: 1.2
+Hash: 9632ba095a2e0f4ed73291c10363d777
+
+Package: evaluate
+Source: CRAN
+Version: 0.10
+Hash: c3601a10c987d439e0c63ec635234a76
+Requires: stringr
+
+Package: gdtools
+Source: CRAN
+Version: 0.1.4
+Hash: 5df4a72d35b080efbd4a68e8b93c6b1e
+Requires: Rcpp, withr
+
+Package: ggplot2
+Source: CRAN
+Version: 2.2.1
+Hash: 46e5cb78836848aa44655e577433f54b
+Requires: digest, gtable, lazyeval, plyr, reshape2, scales, tibble
+
+Package: gridExtra
+Source: CRAN
+Version: 2.2.1
+Hash: 8f54b57d4b0598ed5b27e0eafe86a670
+Requires: gtable
+
+Package: gtable
+Source: CRAN
+Version: 0.2.0
+Hash: cd78381a9d3fea966ac39bd0daaf5554
+
+Package: highr
+Source: CRAN
+Version: 0.6
+Hash: aa3d5b7912b5fed4b546ed5cd2a1760b
+
+Package: htmlTable
+Source: CRAN
+Version: 1.9
+Hash: b2a584fec4ff8c6206b01a55bed18e55
+Requires: checkmate, htmlwidgets, knitr, magrittr, stringr
+
+Package: htmltools
+Source: CRAN
+Version: 0.3.6
+Hash: fb62c5ebb577da9b27b9a0b660ba7fc4
+Requires: Rcpp, digest
+
+Package: htmlwidgets
+Source: CRAN
+Version: 0.8
+Hash: e7a3c80acddc2412f96d616949e40bb8
+Requires: htmltools, jsonlite, yaml
+
+Package: jsonlite
+Source: CRAN
+Version: 1.4
+Hash: 24cc0ffeb1771d710173d9803a131870
+
+Package: knitr
+Source: CRAN
+Version: 1.15.1
+Hash: eed7437e2b614c9e3923b7932b16ac97
+Requires: digest, evaluate, highr, markdown, stringr, yaml
+
+Package: labeling
+Source: CRAN
+Version: 0.3
+Hash: ecf589b42cd284b03a4beb9665482d3e
+
+Package: latticeExtra
+Source: CRAN
+Version: 0.6-28
+Hash: efdf3a10a129129f7b8f4ae5a0d7ec3d
+Requires: RColorBrewer
+
+Package: lazyeval
+Source: CRAN
+Version: 0.2.0
+Hash: 3d6e7608e65bbf5cb170dab1e3c9ed8b
+
+Package: lme4
+Source: CRAN
+Version: 1.1-13
+Hash: 2bebffc799253fd4252ff299cfa2bdad
+Requires: Rcpp, RcppEigen, minqa, nloptr
+
+Package: lmerTest
+Source: CRAN
+Version: 2.0-33
+Hash: eebe91adf31427a467384a8e13b797a1
+Requires: Hmisc, ggplot2, lme4, plyr
+
+Package: lsmeans
+Source: CRAN
+Version: 2.26-3
+Hash: b3f18a3cc92f25de8ea5612a01fb0ca9
+Requires: coda, estimability, multcomp, mvtnorm, plyr, xtable
+
+Package: magrittr
+Source: CRAN
+Version: 1.5
+Hash: bdc4d48c3135e8f3b399536ddf160df4
+
+Package: markdown
+Source: CRAN
+Version: 0.8
+Hash: 045d7c594d503b41f1c28946d076c8aa
+Requires: mime
+
+Package: mime
+Source: CRAN
+Version: 0.5
+Hash: 463550cf44fb6f0a2359368f42eebe62
+
+Package: minqa
+Source: CRAN
+Version: 1.2.4
+Hash: 6e61ec948327e6dd044ccb09cf12db8d
+Requires: Rcpp
+
+Package: mnormt
+Source: CRAN
+Version: 1.5-5
+Hash: d0d5efbb1fb26d2dc5f9394c223084b5
+
+Package: modeltools
+Source: CRAN
+Version: 0.2-21
+Hash: 3dc03397b2a4375c8a5e5f09c8cf0ae1
+
+Package: multcomp
+Source: CRAN
+Version: 1.4-6
+Hash: 6c2ce6c04299742433fde739755f0f4f
+Requires: TH.data, mvtnorm, sandwich, survival
+
+Package: munsell
+Source: CRAN
+Version: 0.4.3
+Hash: f96d896947fcaf9b6d0074002e9f4f9d
+Requires: colorspace
+
+Package: mvtnorm
+Source: CRAN
+Version: 1.0-6
+Hash: 1f55cdac387721d4eda1126ac9aba73b
+
+Package: nloptr
+Source: CRAN
+Version: 1.0.4
+Hash: 8053df240a4635aeb54fc68c6de67709
+
+Package: numDeriv
+Source: CRAN
+Version: 2016.8-1
+Hash: 3a9d0fc99ba2f6aaa500b3d584962be2
+
+Package: optextras
+Source: CRAN
+Version: 2016-8.8
+Hash: 244419fe184e8c45f4b4e353cc3fd40d
+Requires: numDeriv
+
+Package: optimx
+Source: CRAN
+Version: 2013.8.7
+Hash: 33e226fd169b8a0e414413b418d3b751
+Requires: BB, Rcgmin, Rvmmin, dfoptim, minqa, numDeriv, setRNG, svUnit,
+    ucminf
+
+Package: packrat
+Source: CRAN
+Version: 0.4.8-1
+Hash: 6ad605ba7b4b476d84be6632393f5765
+
+Package: pander
+Source: CRAN
+Version: 0.6.0
+Hash: 7b4a043a108a4c864d6f30877f1fe5b6
+Requires: Rcpp, digest
+
+Package: pbkrtest
+Source: CRAN
+Version: 0.4-7
+Hash: f195c3a0f527f69c491569c5cbaaf1db
+Requires: lme4
+
+Package: plyr
+Source: CRAN
+Version: 1.8.4
+Hash: c9ddbdcfd74ff964e3e7d0b692a8dd70
+Requires: Rcpp
+
+Package: praise
+Source: CRAN
+Version: 1.0.0
+Hash: 77da8f1df873a4b91e5c4a68fe2fb1b6
+
+Package: psych
+Source: CRAN
+Version: 1.7.8
+Hash: a9e7713423365e42e06413285a89e610
+Requires: mnormt
+
+Package: quadprog
+Source: CRAN
+Version: 1.5-5
+Hash: 69000b7dc41b09977dcf781f909d235c
+
+Package: quantreg
+Source: CRAN
+Version: 5.33
+Hash: 30421e83e9d36563250019b6b2adafce
+Requires: MatrixModels, SparseM
+
+Package: reshape2
+Source: CRAN
+Version: 1.4.2
+Hash: 790c06c11c84041b814139d731a872b9
+Requires: Rcpp, plyr, stringr
+
+Package: rmarkdown
+Source: CRAN
+Version: 1.8
+Hash: 2a7842e3cee62a79dd737d17e9e9d86b
+Requires: base64enc, evaluate, htmltools, jsonlite, knitr, mime,
+    rprojroot, stringr, yaml
+
+Package: rococo
+Source: CRAN
+Version: 1.1.5
+Hash: 4177723c7b65d48f4eaeda8ee33f60f0
+Requires: Rcpp
+
+Package: rprojroot
+Source: CRAN
+Version: 1.3-2
+Hash: a25c3f70c166fb3fbabc410eb32b6366
+Requires: backports
+
+Package: sandwich
+Source: CRAN
+Version: 2.3-4
+Hash: eb356b4a90fa5887a45917b42587bf6c
+Requires: zoo
+
+Package: scales
+Source: CRAN
+Version: 0.4.1
+Hash: 2d008b6e3fb9938255669ddf3c85f1f3
+Requires: RColorBrewer, Rcpp, dichromat, labeling, munsell, plyr
+
+Package: setRNG
+Source: CRAN
+Version: 2013.9-1
+Hash: 76293d27228a150d7a794535b2b28819
+
+Package: stringdist
+Source: CRAN
+Version: 0.9.4.4
+Hash: ab03f2a40cbc89d6cddf444c93e81a42
+
+Package: stringi
+Source: CRAN
+Version: 1.1.5
+Hash: b6308e49357a0b475f433599e0d8b5eb
+
+Package: stringr
+Source: CRAN
+Version: 1.2.0
+Hash: 25a86d7f410513ebb7c0bc6a5e16bdc3
+Requires: magrittr, stringi
+
+Package: survival
+Source: CRAN
+Version: 2.41-3
+Hash: db4930fd2dbaff5a78b71832aea4b50d
+
+Package: svUnit
+Source: CRAN
+Version: 0.7-12
+Hash: e5e06c352508376672064e9178df1f20
+
+Package: svglite
+Source: CRAN
+Version: 1.2.0
+Hash: bbe9ea91a680213c37154e97beb67f90
+Requires: BH, Rcpp, gdtools
+
+Package: testthat
+Source: CRAN
+Version: 1.0.2
+Hash: 88d5291104227f9dc2e7c7c1d0eb6c74
+Requires: R6, crayon, digest, magrittr, praise
+
+Package: tibble
+Source: CRAN
+Version: 1.3.0
+Hash: 8de64ed3345488e66b676875ed1ebdce
+Requires: Rcpp, lazyeval
+
+Package: tidyr
+Source: CRAN
+Version: 0.6.2
+Hash: abc0369a6414a7204811ae1a66a4a158
+Requires: Rcpp, dplyr, lazyeval, magrittr, stringi, tibble
+
+Package: ucminf
+Source: CRAN
+Version: 1.1-4
+Hash: 93143d845c6b1969cf0ea8fcac5c9119
+
+Package: viridis
+Source: CRAN
+Version: 0.4.0
+Hash: 5bdac1bcf74a10a7a96f82191f498ab7
+Requires: ggplot2, gridExtra, viridisLite
+
+Package: viridisLite
+Source: CRAN
+Version: 0.2.0
+Hash: 10f0c25af3dc84eaae10f5854f47efdb
+
+Package: wesanderson
+Source: CRAN
+Version: 0.3.2
+Hash: ef5f6994d0a579b6c3bcf90b184068d2
+
+Package: whoppeR
+Source: WRAN
+Version: 0.0.0.9019
+Hash: 692fad82cb663ec1b1da043c9d2a49e9
+Requires: dplyr, effsize, ggplot2, lazyeval, magrittr, stringdist,
+    tidyr
+
+Package: withr
+Source: CRAN
+Version: 1.0.2
+Hash: 774eb7be9087cdc24b53b74e5359cfac
+
+Package: xtable
+Source: CRAN
+Version: 1.8-2
+Hash: 7293235cfcc14cdff1ce7fd1a0212031
+
+Package: yaml
+Source: CRAN
+Version: 2.1.14
+Hash: c81230c3a7d9ba20607ad6b4331173d1
+
+Package: zoo
+Source: CRAN
+Version: 1.8-0
+Hash: df9711767f56f086e8a8d1f0fb926ff6

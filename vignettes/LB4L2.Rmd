@@ -15,7 +15,7 @@ vignette: >
 ---
 
 ```{r setup, include=FALSE}
-devtools::load_all()
+library(FAM)
 library(dplyr)
 library(tidyr)
 library(whoppeR)
@@ -33,45 +33,29 @@ bySubject_group_prac_OCprac <- summary(LB4L2_final, level = "subject")
 byGroup_prac_OCprac <- summary(bySubject_group_prac_OCprac)
 ```
 
-```{r difference_sem_plot, fig.height=6.5, fig.width = 8.5, dev="svglite"}
-diff_bySubject_group_prac_OCprac <- bySubject_group_prac_OCprac %>%
-  filter(acc==1) %>%
-  select(-acc, -N_acc, -N_RT, -cell_max) %>%
-  gather(key="var", value="value", p, RT_median, RT_mean, logRT_mean) %>%
-  unite(condition, practice, OCpractice, sep=".") %>%
-  spread(condition, value) %>%
-  group_by(subject, var) %>%
-  mutate_at(c("N.S", "N.T", "S.N", "T.N"),
-            funs(. - N.N)) %>%
-  ungroup() %>%
-  select(-N.N) %>%
-  gather(key="cond", value="value", N.S, N.T, S.N, T.N) %>%
-  separate(cond, into = c("practice", "OCpractice"),sep = "\\.") %>%
-  spread(var,value) %>%
-  recode_conditions()
-
-diff_byGroup_prac_OCprac <- diff_bySubject_group_prac_OCprac %>%
-  group_by(group, practice, cue_type) %>%
-  summarise_at(c("p","logRT_mean","RT_mean","RT_median"),
-               funs(sem = whoppeR::sem(., na.rm=TRUE))
-               )  %>%
+```{r Figure6}
+bySubject_group_prac_WISE <- filter(bySubject_group_prac_OCprac, acc==1) %>%
+  mutate(prac_cond = as.character(interaction(practice, OCpractice))) %>%
+  WISEsummary(dependentvars = c("p", "logRT_mean"),
+              withinvars = "prac_cond",
+              betweenvars = "group",
+              idvar = "subject",
+              na.rm=TRUE) %>%
   rename_(.dots=setNames(names(.),
                          gsub("_mean$", "", names(.))
                          )
-          )
-
-intervention <- filter(byGroup_prac_OCprac, !(practice == "N" & OCpractice == "N")) %>%
-  select(group, practice, OCpractice, p, RT_mean, logRT_mean, RT_median) %>%
+          ) %>%
+  separate(prac_cond, into = c("practice", "OCpractice"),sep = "\\.") %>%
   recode_conditions() %>%
-  left_join(diff_byGroup_prac_OCprac, by = c("group", "practice", "cue_type"))
+  select_(.dots = c("group", "practice", "cue_type", "p", "p_sem", "logRT_mean", "logRT_mean_sem"))
 
-control <- filter(byGroup_prac_OCprac, practice == "N", OCpractice == "N") %>%
-  select(group, practice, OCpractice, p, RT_mean, logRT_mean, RT_median) %>%
-  recode_conditions() %>%
-  mutate(p_sem = NA, RT_mean_sem = NA, logRT_mean_sem = NA, RT_median_sem = NA)
-control <- rbind(mutate(control, cue_type = "Same Cue"),
-                 mutate(control, cue_type = "Other Cue")
-                 )
+control <- filter(bySubject_group_prac_WISE, is.na(cue_type))
+intervention <- filter(bySubject_group_prac_WISE, !is.na(cue_type))
+
+plot_data <- bind_rows(intervention,
+                       mutate(control, cue_type = "Same Cue"),
+                       mutate(control, cue_type = "Other Cue")
+                       )
 
 theme_set(theme_bw(base_size = 16) +
           theme(plot.title = element_text(hjust = .5),
@@ -79,7 +63,7 @@ theme_set(theme_bw(base_size = 16) +
                 axis.title = element_text(size=12)
                 )
           )
-acc <- ggplot(bind_rows(control,intervention),
+acc <- ggplot(plot_data,
               aes(x=group, y=p,
                   ymax = p + p_sem,
                   ymin = p - p_sem,
@@ -131,19 +115,8 @@ g <- arrangeGrob(acc, RT,
                  widths = c(.395, .605))
 grid.draw(g)
 
-# CD <- summary(LB4L2_final, level = "group", given_practice = TRUE, conditional = TRUE) 
-# identical(summary(LB4L2_final, level = "group", given_practice = 1:2, conditional = TRUE), CD)
-# CD_1 <- summary(LB4L2_final, level = "group", given_practice = 1, conditional = TRUE)
-# CD_2 <- summary(LB4L2_final, level = "group", given_practice = 2, conditional = TRUE)
-# 
-# joint <- summary(LB4L2_final, level = "group", given_practice = TRUE)
-# joint_1 <- summary(LB4L2_final, level = "group", given_practice = 1)
-# joint_2 <- summary(LB4L2_final, level = "group", given_practice = 2)
-# 
-# CD_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE, conditional = TRUE)
-# joint_raw <- summary(LB4L2_final, level = "raw", given_practice = TRUE)
-# identical(CD_raw, joint_raw)
 ```
+
 
 ## Accuracy and RT by Experimental Condition
 ```{r IV}
@@ -390,3 +363,14 @@ Quantiles are calculated using all observed RT's within a condition, pooled over
 # 
 # quantile_plot %+% pooled_quantiles_correct
 ```
+
+
+```{r nuisance_RT}
+x <- group_by(LB4L2_tp, subject, list, round) %>%
+  mutate(duration = lead(onset) - onset) %>%
+  ungroup() %>%  
+  filter(!is.na(duration)) %>%
+  summarise(avg_dur = mean(duration),
+            avg_log_dur = mean(log(duration)))
+```
+
