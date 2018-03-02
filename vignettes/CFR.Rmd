@@ -697,7 +697,7 @@ par(mfcol=c(1,1))
 panderOptions('knitr.auto.asis', TRUE)
 ```
 
-```{r follow_up_ANOVA, include=FALSE}
+```{r follow_up_ANOVA}
 model_formula <- update(base_formula, paste("logRT_mean", deparse(base_formula)))
 
 np_tp_only_anova <- aov_car(model_formula,
@@ -719,16 +719,16 @@ np_sp_only_anova <- aov_car(model_formula,
 pander(nice(np_sp_only_anova), "No Practice vs Restudy")
 ```
 
-```{r first_seven, include=FALSE}
+```{r first_seven}
 RT_order_anova <- aov_car(logRT_mean ~ class*output_order + Error(subject/(class*output_order)),
-                          data = filter(bySubjects_cond_order_noMissing,
-                                        output_order > 1) %>%
-                                 mutate_at(.cols = c("subject","class","output_order"),
+                          data = mutate_at(bySubjects_cond_order_noMissing,
+                                           .cols = c("subject","class","output_order"),
                                            .funs = factor
                                            ),
                           anova_table = list(es = 'pes'))
-pander(nice(RT_order_anova), "First 7 ANOVA")
-pairs(lsmeans(RT_order_anova, ~ class), adjust = "bonferroni")
+pander(nice(RT_order_anova), "Forward-Order ANOVA")
+pander(summary(pairs(lsmeans(RT_order_anova, ~ class), adjust = "bonferroni")),
+       "Forward-Order Contrasts")
 ```
 
 ## Final Figures
